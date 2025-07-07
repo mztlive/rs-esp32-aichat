@@ -1,0 +1,3 @@
+#引入 esp-idf环境
+
+. ~/Development/esp32/esp-idf/export.sh
