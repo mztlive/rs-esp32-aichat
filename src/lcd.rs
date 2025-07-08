@@ -1,4 +1,5 @@
 use anyhow::Result;
+use esp_idf_hal::i2c::I2cDriver;
 use esp_idf_hal::{gpio::PinDriver, peripherals::Peripherals};
 use esp_idf_sys::st77916::{
     esp_lcd_new_panel_st77916, st77916_vendor_config_t, st77916_vendor_config_t__bindgen_ty_1,
@@ -34,19 +35,19 @@ impl LcdController {
 
     fn init_spi_bus() -> Result<esp_lcd_panel_io_handle_t> {
         unsafe {
-            // QSPI 四线 + 时钟
+            // QSPI 四线 + 时钟 (根据引脚文档修正)
             let bus_cfg = spi_bus_config_t {
-                __bindgen_anon_1: spi_bus_config_t__bindgen_ty_1 { mosi_io_num: 41 },
+                __bindgen_anon_1: spi_bus_config_t__bindgen_ty_1 { mosi_io_num: 46 }, // SDA0
                 __bindgen_anon_2: spi_bus_config_t__bindgen_ty_2 { miso_io_num: -1 },
-                sclk_io_num: 40,
-                __bindgen_anon_3: spi_bus_config_t__bindgen_ty_3 { quadwp_io_num: 46 }, // SD0
-                __bindgen_anon_4: spi_bus_config_t__bindgen_ty_4 { quadhd_io_num: 45 }, // SD1
-                data4_io_num: -1,
+                sclk_io_num: 40, // LCD_SCK
+                __bindgen_anon_3: spi_bus_config_t__bindgen_ty_3 { quadwp_io_num: 42 }, // SDA2
+                __bindgen_anon_4: spi_bus_config_t__bindgen_ty_4 { quadhd_io_num: 45 }, // SDA1
+                data4_io_num: 41, // SDA3
                 data5_io_num: -1,
                 data6_io_num: -1,
                 data7_io_num: -1,
-                max_transfer_sz: LCD_WIDTH * LCD_HEIGHT * 2,
-                flags: 0,
+                max_transfer_sz: LCD_WIDTH * 80 * 2,
+                flags: SPICOMMON_BUSFLAG_QUAD,
                 intr_flags: 0,
                 isr_cpu_id: 0,
             };
@@ -54,7 +55,7 @@ impl LcdController {
             esp!(spi_bus_initialize(
                 spi_host_device_t_SPI2_HOST as _,
                 &bus_cfg,
-                spi_common_dma_t_SPI_DMA_CH_AUTO
+                spi_common_dma_t_SPI_DMA_CH_AUTO // 使用自动DMA通道
             ))?;
         }
 
@@ -68,7 +69,9 @@ impl LcdController {
             trans_queue_depth: 10,
             flags: esp_lcd_panel_io_spi_config_t__bindgen_ty_1 {
                 _bitfield_align_1: [],
-                _bitfield_1: Default::default(),
+                _bitfield_1: esp_lcd_panel_io_spi_config_t__bindgen_ty_1::new_bitfield_1(
+                    0, 0, 0, 0, 1, 0, 0, 0, // quad_mode设为1，其他为0
+                ),
                 __bindgen_padding_0: [0; 3],
             },
             lcd_cmd_bits: 8,
@@ -93,7 +96,7 @@ impl LcdController {
         let vendor_cfg = st77916_vendor_config_t {
             flags: st77916_vendor_config_t__bindgen_ty_1 {
                 _bitfield_align_1: [],
-                _bitfield_1: st77916_vendor_config_t__bindgen_ty_1::new_bitfield_1(1),
+                _bitfield_1: st77916_vendor_config_t__bindgen_ty_1::new_bitfield_1(1), // use_qspi_interface = 1
                 __bindgen_padding_0: [0; 3],
             },
             init_cmds: core::ptr::null(),
@@ -102,9 +105,9 @@ impl LcdController {
         let panel_cfg = esp_lcd_panel_dev_config_t {
             reset_gpio_num: -1, // 如果你接了 RST，请填实际引脚
             __bindgen_anon_1: esp_lcd_panel_dev_config_t__bindgen_ty_1 {
-                rgb_ele_order: lcd_rgb_element_order_t_LCD_RGB_ELEMENT_ORDER_RGB,
+                rgb_ele_order: lcd_rgb_element_order_t_LCD_RGB_ELEMENT_ORDER_RGB, // 恢复RGB顺序
             },
-            data_endian: lcd_rgb_data_endian_t_LCD_RGB_DATA_ENDIAN_BIG,
+            data_endian: lcd_rgb_data_endian_t_LCD_RGB_DATA_ENDIAN_LITTLE, // 恢复大端
             bits_per_pixel: 16,
             flags: esp_lcd_panel_dev_config_t__bindgen_ty_2 {
                 _bitfield_align_1: [],
@@ -120,15 +123,42 @@ impl LcdController {
                 &panel_cfg as *const _ as *const esp_idf_sys::st77916::esp_lcd_panel_dev_config_t,
                 &mut panel as *mut _ as *mut *mut esp_idf_sys::st77916::esp_lcd_panel_t
             ))?;
+            println!("开始面板复位和初始化...");
             esp!(esp_lcd_panel_reset(panel))?;
+            println!("面板复位完成");
+
+            // 等待复位稳定
+            std::thread::sleep(std::time::Duration::from_millis(200));
+
             esp!(esp_lcd_panel_init(panel))?;
+            println!("面板初始化完成");
+
+            // 等待初始化稳定
+            std::thread::sleep(std::time::Duration::from_millis(200));
 
             // 设置显示方向
             esp!(esp_lcd_panel_mirror(panel, false, false))?;
             esp!(esp_lcd_panel_swap_xy(panel, false))?;
+            println!("显示方向设置完成");
+
+            // 尝试颜色反转以测试显示
+            esp!(esp_lcd_panel_invert_color(panel, false))?;
+            println!("颜色反转设置完成");
+
+            // 尝试不同的颜色反转
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            esp!(esp_lcd_panel_invert_color(panel, true))?;
+            println!("颜色反转开启");
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            esp!(esp_lcd_panel_invert_color(panel, false))?;
+            println!("颜色反转关闭");
 
             // 开启显示
             esp!(esp_lcd_panel_disp_on_off(panel, true))?;
+            println!("显示开启完成");
+
+            // 等待显示稳定
+            std::thread::sleep(std::time::Duration::from_millis(500));
         }
 
         Ok(panel)
