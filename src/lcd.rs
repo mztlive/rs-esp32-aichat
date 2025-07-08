@@ -63,7 +63,7 @@ impl LcdController {
         let io_cfg = esp_lcd_panel_io_spi_config_t {
             cs_gpio_num: 21,
             dc_gpio_num: -1,     // ST77916 QSPI 模式无需 DC
-            pclk_hz: 40_000_000, // 40 MHz
+            pclk_hz: 20_000_000, // 降低到 20 MHz 提高稳定性
             spi_mode: 0,
             trans_queue_depth: 10,
             flags: esp_lcd_panel_io_spi_config_t__bindgen_ty_1 {
@@ -113,6 +113,7 @@ impl LcdController {
             },
             vendor_config: &vendor_cfg as *const _ as *mut _,
         };
+
         unsafe {
             esp!(esp_lcd_new_panel_st77916(
                 io_handle as *mut esp_idf_sys::st77916::esp_lcd_panel_io_t,
@@ -152,6 +153,7 @@ impl LcdController {
         unsafe {
             esp!(esp_lcd_panel_swap_xy(self.panel, swap_xy))?;
         }
+
         Ok(())
     }
 
@@ -166,10 +168,10 @@ impl LcdController {
         unsafe {
             esp!(esp_lcd_panel_draw_bitmap(
                 self.panel,
-                x,
-                y,
-                width,
-                height,
+                x,          // x_start
+                y,          // y_start
+                x + width,  // x_end (exclusive)
+                y + height, // y_end (exclusive)
                 data as *const _
             ))?;
         }
@@ -177,32 +179,30 @@ impl LcdController {
     }
 
     pub fn clear(&self, color: u16) -> Result<()> {
-        static mut COLOR_BUFFER: [u16; (360 * 360) as usize] = [0; 360 * 360];
-        unsafe {
-            COLOR_BUFFER.fill(color);
-            self.draw_bitmap(0, 0, LCD_WIDTH, LCD_HEIGHT, COLOR_BUFFER.as_ptr())?;
+        // 分块清屏，每次处理一行，避免栈溢出
+        let line_buffer = vec![color; LCD_WIDTH as usize];
+        for y in 0..LCD_HEIGHT {
+            self.draw_bitmap(0, y, LCD_WIDTH, 1, line_buffer.as_ptr())?;
         }
         Ok(())
     }
 
     pub fn draw_test_pattern(&self) -> Result<()> {
-        static mut COLOR_BUFFER: [u16; (360 * 360) as usize] = [0; 360 * 360];
-        unsafe {
-            // 创建彩色条纹图案
-            for y in 0..360 {
-                for x in 0..360 {
-                    let color = if x < 120 {
-                        0xF800 // 红色
-                    } else if x < 240 {
-                        0x07E0 // 绿色
-                    } else {
-                        0x001F // 蓝色
-                    };
-                    COLOR_BUFFER[y * 360 + x] = color;
-                }
-            }
+        // 分行绘制测试图案，避免栈溢出
+        let mut line_buffer = vec![0u16; LCD_WIDTH as usize];
 
-            self.draw_bitmap(0, 0, LCD_WIDTH, LCD_HEIGHT, COLOR_BUFFER.as_ptr())?;
+        for y in 0..LCD_HEIGHT {
+            for x in 0..LCD_WIDTH {
+                let color = if x < 120 {
+                    0xF800 // 红色
+                } else if x < 240 {
+                    0x07E0 // 绿色
+                } else {
+                    0x001F // 蓝色
+                };
+                line_buffer[x as usize] = color;
+            }
+            self.draw_bitmap(0, y, LCD_WIDTH, 1, line_buffer.as_ptr())?;
         }
         Ok(())
     }
