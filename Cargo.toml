@@ -25,6 +25,9 @@ experimental = ["esp-idf-svc/experimental"]
 [dependencies]
 log = "0.4"
 esp-idf-svc = "0.51"
+esp-idf-hal = "0.45.2"
+esp-idf-sys = "0.36.1"
+anyhow = "1.0.98"
 
 # --- Optional Embassy Integration ---
 # esp-idf-svc = { version = "0.51", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }
@@ -45,3 +48,16 @@ esp-idf-svc = "0.51"
 
 [build-dependencies]
 embuild = "0.33"
+
+
+# 告诉 build-script 额外拉取远程组件
+[[package.metadata.esp-idf-sys.extra_components]]
+remote_component = { name = "espressif/esp_lcd_st77916", version = "1.*" }
+bindings_header  = "bindings.h"
+bindings_module  = "st77916"
+
+
+bindgen_extra_clang_args = [
+  "-I${IDF_PATH}/components/esp_lcd/include",
+  "-I${IDF_PATH}/components/driver/include",
+]
