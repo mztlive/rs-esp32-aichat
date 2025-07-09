@@ -4,7 +4,10 @@ use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 
 mod lcd;
 mod lcd_cmds;
-use lcd::{LcdController, COLOR_BLUE, COLOR_GREEN, COLOR_RED, COLOR_WHITE};
+use embedded_graphics::pixelcolor::Rgb565;
+use lcd::{LcdController, COLOR_WHITE};
+
+use crate::lcd::{COLOR_BLACK, COLOR_RED};
 
 fn main() -> Result<()> {
     // 必须先调用，打补丁
@@ -20,27 +23,23 @@ fn main() -> Result<()> {
     let mut lcd = LcdController::new(p)?;
 
     println!("显示纯白色...");
-    lcd.fill_screen(COLOR_WHITE)?;
+    lcd.fill_screen(COLOR_WHITE)?; // 保持运行
 
-    // 使用embedded-graphics绘制文本
-    println!("绘制文本示例...");
+    // 暂停3秒
+    FreeRtos::delay_ms(3000);
 
-    // 绘制白色文本
-    lcd.draw_colored_text("Hello ESP32!", 10, 10, 255, 255, 255)?;
+    lcd.fill_screen(COLOR_RED)?;
 
-    // 绘制红色文本
-    lcd.draw_colored_text("Red Text", 10, 30, 255, 0, 0)?;
+    // 暂停3秒
+    FreeRtos::delay_ms(3000);
 
-    // 绘制绿色文本
-    lcd.draw_colored_text("Green Text", 10, 50, 0, 255, 0)?;
+    // 暂停3秒
+    lcd.fill_screen(COLOR_BLACK)?;
 
-    // 绘制蓝色文本
-    lcd.draw_colored_text("Blue Text", 10, 70, 0, 0, 255)?;
+    // lcd.fill_screen(ColorRe)
 
-    // 在屏幕底部绘制信息
-    lcd.draw_colored_text("ESP32 with Rust", 10, 330, 255, 255, 0)?;
+    lcd.draw_text("Hello ESP32!", 180, 180, Rgb565::new(31, 63, 31))?;
 
-    // 保持运行
     loop {
         FreeRtos::delay_ms(10000);
     }

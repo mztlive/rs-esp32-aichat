@@ -98,7 +98,7 @@ impl LcdController {
                 __bindgen_anon_4: spi_bus_config_t__bindgen_ty_4 {
                     data3_io_num: QSPI_PIN_NUM_LCD_SDA3,
                 },
-                max_transfer_sz: LCD_WIDTH * 80 * 2,
+                max_transfer_sz: LCD_WIDTH * LCD_HEIGHT * 2,
                 ..Default::default()
             };
 
@@ -124,7 +124,7 @@ impl LcdController {
             cs_gpio_num: QSPI_PIN_NUM_LCD_CS,
             dc_gpio_num: -1, // QSPI模式不需要DC引脚
             spi_mode: 0,
-            pclk_hz: 80 * 1000 * 1000,
+            pclk_hz: 40 * 1000 * 1000,
             trans_queue_depth: 10,
             on_color_trans_done: None,
             user_ctx: ptr::null_mut(),
@@ -203,6 +203,9 @@ impl LcdController {
             esp!(esp_lcd_panel_mirror(self.panel, false, false))?; // 不镜像
         }
 
+        // 步骤4：清除显示器内容，确保干净的显示
+        self.fill_screen(COLOR_BLACK)?;
+
         Ok(())
     }
 
@@ -240,9 +243,16 @@ impl LcdController {
 
     /// 填充整个屏幕（分块传输）
     pub fn fill_screen(&self, color: u16) -> Result<()> {
-        let color = color.to_be();
-        let buffer = vec![color; (LCD_WIDTH * LCD_HEIGHT) as usize];
-        self.draw_bitmap(0, 0, LCD_WIDTH, LCD_HEIGHT, &buffer)?;
+        // 使用分块传输以减少内存使用并提高稳定性
+        const CHUNK_HEIGHT: i32 = 40;
+
+        for y in (0..LCD_HEIGHT).step_by(CHUNK_HEIGHT as usize) {
+            let chunk_height = (CHUNK_HEIGHT).min(LCD_HEIGHT - y);
+            let chunk_size = (LCD_WIDTH * chunk_height) as usize;
+            let buffer = vec![color; chunk_size];
+
+            self.draw_bitmap(0, y, LCD_WIDTH, y + chunk_height, &buffer)?;
+        }
 
         println!("fill_screen: 填充完成");
         Ok(())
@@ -264,7 +274,6 @@ impl LcdController {
             return Ok(()); // 超出边界直接返回
         }
 
-        let color = color.to_be();
         let buffer = [color];
         self.draw_bitmap(x, y, x + 1, y + 1, &buffer)?;
         Ok(())
@@ -318,8 +327,6 @@ impl LcdController {
             return Ok(());
         }
 
-        let color = color.to_be();
-
         for y in -radius..=radius {
             let y_coord = center_y + y;
             if !(0..LCD_HEIGHT).contains(&y_coord) {
@@ -349,6 +356,29 @@ impl LcdController {
 
         let text_obj = Text::with_text_style(text, Point::new(x, y), character_style, text_style);
         text_obj.draw(self)?;
+        Ok(())
+    }
+
+    /// 绘制平滑文本（使用背景色进行简单的抗锯齿）
+    pub fn draw_smooth_text(
+        &mut self,
+        text: &str,
+        x: i32,
+        y: i32,
+        fg_color: Rgb565,
+        bg_color: Rgb565,
+    ) -> Result<()> {
+        // 先绘制背景色的文本作为阴影（偏移1像素）
+        let shadow_color = Rgb565::new(
+            (fg_color.r() + bg_color.r()) / 2,
+            (fg_color.g() + bg_color.g()) / 2,
+            (fg_color.b() + bg_color.b()) / 2,
+        );
+
+        self.draw_text(text, x + 1, y + 1, shadow_color)?;
+
+        // 再绘制前景色的文本
+        self.draw_text(text, x, y, fg_color)?;
         Ok(())
     }
 
