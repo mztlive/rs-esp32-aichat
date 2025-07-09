@@ -1,13 +1,41 @@
 use anyhow::Result;
-use esp_idf_hal::i2c::I2cDriver;
-use esp_idf_hal::{gpio::PinDriver, peripherals::Peripherals};
+use esp_idf_hal::gpio::PinDriver;
+use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_sys::st77916::{
     esp_lcd_new_panel_st77916, st77916_vendor_config_t, st77916_vendor_config_t__bindgen_ty_1,
 };
 use esp_idf_sys::*;
+use std::ptr;
 
+// ===================== 常量区 =====================
+// 分辨率 & 像素格式
 pub const LCD_WIDTH: i32 = 360;
 pub const LCD_HEIGHT: i32 = 360;
+pub const LCD_BIT_PER_PIXEL: u8 = 16; // RGB565
+
+// QSPI 引脚映射（根据硬件连接）
+pub const QSPI_LCD_HOST: i32 = spi_host_device_t_SPI2_HOST as i32;
+pub const QSPI_PIN_NUM_LCD_SCK: i32 = gpio_num_t_GPIO_NUM_40; // LCD_SCK
+pub const QSPI_PIN_NUM_LCD_CS: i32 = gpio_num_t_GPIO_NUM_21; // LCD_CS
+pub const QSPI_PIN_NUM_LCD_SDA0: i32 = gpio_num_t_GPIO_NUM_46; // LCD_SDA0 (DATA0)
+pub const QSPI_PIN_NUM_LCD_SDA1: i32 = gpio_num_t_GPIO_NUM_45; // LCD_SDA1 (DATA1)
+pub const QSPI_PIN_NUM_LCD_SDA2: i32 = gpio_num_t_GPIO_NUM_42; // LCD_SDA2 (DATA2)
+pub const QSPI_PIN_NUM_LCD_SDA3: i32 = gpio_num_t_GPIO_NUM_41; // LCD_SDA3 (DATA3)
+pub const QSPI_PIN_NUM_LCD_TE: i32 = gpio_num_t_GPIO_NUM_18; // LCD_TE (Tearing Effect)
+pub const QSPI_PIN_NUM_LCD_BL: i32 = gpio_num_t_GPIO_NUM_5; // LCD_BL (背光)
+pub const QSPI_PIN_NUM_LCD_RST: i32 = gpio_num_t_GPIO_NUM_NC; // LCD_RST
+
+// 预定义颜色（RGB565）
+pub const COLOR_BLACK: u16 = 0x0000;
+pub const COLOR_WHITE: u16 = 0xFFFF;
+pub const COLOR_RED: u16 = 0xF800;
+pub const COLOR_GREEN: u16 = 0x07E0;
+pub const COLOR_BLUE: u16 = 0x001F;
+pub const COLOR_YELLOW: u16 = 0xFFE0;
+pub const COLOR_CYAN: u16 = 0x07FF;
+pub const COLOR_MAGENTA: u16 = 0xF81F;
+
+// =================================================
 
 pub struct LcdController {
     panel: esp_lcd_panel_handle_t,
@@ -16,74 +44,86 @@ pub struct LcdController {
 }
 
 impl LcdController {
+    /// 创建新的LCD控制器实例
     pub fn new(peripherals: Peripherals) -> Result<Self> {
-        // 1. 初始化 SPI2 总线 (HSPI)
+        // 步骤1：初始化SPI总线
         let io_handle = Self::init_spi_bus()?;
 
-        // 2. 创建 LCD 面板
+        // 步骤2：创建LCD面板
         let panel = Self::create_panel(io_handle)?;
 
-        // 3. 初始化背光
+        // 步骤3：初始化背光控制
         let backlight = Self::init_backlight(peripherals)?;
 
-        Ok(LcdController {
+        // 步骤4：启动显示器
+        let controller = LcdController {
             panel,
             io_handle,
             backlight,
-        })
+        };
+
+        controller.start_display()?;
+
+        Ok(controller)
     }
 
+    /// 初始化QSPI总线（使用官方推荐的配置）
     fn init_spi_bus() -> Result<esp_lcd_panel_io_handle_t> {
         unsafe {
-            // QSPI 四线 + 时钟 (根据引脚文档修正)
-            let bus_cfg = spi_bus_config_t {
-                __bindgen_anon_1: spi_bus_config_t__bindgen_ty_1 { mosi_io_num: 46 }, // SDA0
-                __bindgen_anon_2: spi_bus_config_t__bindgen_ty_2 { miso_io_num: -1 },
-                sclk_io_num: 40, // LCD_SCK
-                __bindgen_anon_3: spi_bus_config_t__bindgen_ty_3 { quadwp_io_num: 42 }, // SDA2
-                __bindgen_anon_4: spi_bus_config_t__bindgen_ty_4 { quadhd_io_num: 45 }, // SDA1
-                data4_io_num: 41, // SDA3
-                data5_io_num: -1,
-                data6_io_num: -1,
-                data7_io_num: -1,
+            // 步骤1：修复QSPI引脚映射（标准QSPI配置）
+            let bus_config = spi_bus_config_t {
+                sclk_io_num: QSPI_PIN_NUM_LCD_SCK, // 时钟线 GPIO40
+                __bindgen_anon_1: spi_bus_config_t__bindgen_ty_1 {
+                    data0_io_num: QSPI_PIN_NUM_LCD_SDA0,
+                },
+                __bindgen_anon_2: spi_bus_config_t__bindgen_ty_2 {
+                    data1_io_num: QSPI_PIN_NUM_LCD_SDA1,
+                },
+                __bindgen_anon_3: spi_bus_config_t__bindgen_ty_3 {
+                    data2_io_num: QSPI_PIN_NUM_LCD_SDA2,
+                },
+                __bindgen_anon_4: spi_bus_config_t__bindgen_ty_4 {
+                    data3_io_num: QSPI_PIN_NUM_LCD_SDA3,
+                },
                 max_transfer_sz: LCD_WIDTH * 80 * 2,
-                flags: SPICOMMON_BUSFLAG_QUAD,
-                intr_flags: 0,
-                isr_cpu_id: 0,
+                ..Default::default()
             };
 
+            // 初始化SPI总线
             esp!(spi_bus_initialize(
-                spi_host_device_t_SPI2_HOST as _,
-                &bus_cfg,
-                spi_common_dma_t_SPI_DMA_CH_AUTO // 使用自动DMA通道
+                QSPI_LCD_HOST as _,
+                &bus_config,
+                spi_common_dma_t_SPI_DMA_CH_AUTO // 自动分配DMA通道
             ))?;
         }
 
-        // 创建 LCD IO（4-线 QSPI）
-        let mut io_handle: esp_lcd_panel_io_handle_t = core::ptr::null_mut();
-        let io_cfg = esp_lcd_panel_io_spi_config_t {
-            cs_gpio_num: 21,
-            dc_gpio_num: -1,     // ST77916 QSPI 模式无需 DC
-            pclk_hz: 20_000_000, // 降低到 20 MHz 提高稳定性
+        // 步骤2：创建Panel IO
+        let mut io_handle: esp_lcd_panel_io_handle_t = ptr::null_mut();
+        let mut flags = esp_lcd_panel_io_spi_config_t__bindgen_ty_1::default();
+        flags.set_quad_mode(1);
+        flags.set_dc_low_on_data(0);
+        flags.set_octal_mode(0);
+        flags.set_sio_mode(0);
+        flags.set_lsb_first(0);
+        flags.set_cs_high_active(0);
+
+        let io_config = esp_lcd_panel_io_spi_config_t {
+            cs_gpio_num: QSPI_PIN_NUM_LCD_CS,
+            dc_gpio_num: -1, // QSPI模式不需要DC引脚
             spi_mode: 0,
+            pclk_hz: 3 * 1000 * 1000,
             trans_queue_depth: 10,
-            flags: esp_lcd_panel_io_spi_config_t__bindgen_ty_1 {
-                _bitfield_align_1: [],
-                _bitfield_1: esp_lcd_panel_io_spi_config_t__bindgen_ty_1::new_bitfield_1(
-                    0, 0, 0, 0, 1, 0, 0, 0, // quad_mode设为1，其他为0
-                ),
-                __bindgen_padding_0: [0; 3],
-            },
-            lcd_cmd_bits: 8,
-            lcd_param_bits: 8,
             on_color_trans_done: None,
-            user_ctx: core::ptr::null_mut(),
+            user_ctx: ptr::null_mut(),
+            lcd_cmd_bits: 32,  // QSPI使用32位命令
+            lcd_param_bits: 8, // 8位参数
+            flags,
         };
 
         unsafe {
             esp!(esp_lcd_new_panel_io_spi(
                 spi_host_device_t_SPI2_HOST as _,
-                &io_cfg,
+                &io_config,
                 &mut io_handle
             ))?;
         }
@@ -91,152 +131,119 @@ impl LcdController {
         Ok(io_handle)
     }
 
+    /// 创建LCD面板
     fn create_panel(io_handle: esp_lcd_panel_io_handle_t) -> Result<esp_lcd_panel_handle_t> {
-        let mut panel: esp_lcd_panel_handle_t = core::ptr::null_mut();
-        let vendor_cfg = st77916_vendor_config_t {
-            flags: st77916_vendor_config_t__bindgen_ty_1 {
-                _bitfield_align_1: [],
-                _bitfield_1: st77916_vendor_config_t__bindgen_ty_1::new_bitfield_1(1), // use_qspi_interface = 1
-                __bindgen_padding_0: [0; 3],
-            },
-            init_cmds: core::ptr::null(),
-            init_cmds_size: 0,
-        };
-        let panel_cfg = esp_lcd_panel_dev_config_t {
-            reset_gpio_num: -1, // 如果你接了 RST，请填实际引脚
+        let mut panel: esp_lcd_panel_handle_t = ptr::null_mut();
+
+        // 配置ST77916供应商特定参数（恢复QSPI）
+        // let vendor_config = st77916_vendor_config_t {
+        //     flags: st77916_vendor_config_t__bindgen_ty_1 {
+        //         _bitfield_align_1: [],
+        //         _bitfield_1: st77916_vendor_config_t__bindgen_ty_1::new_bitfield_1(1), // use_qspi_interface = 1，启用QSPI
+        //         __bindgen_padding_0: [0; 3],
+        //     },
+        //     init_cmds: ptr::null(), // 使用默认初始化命令
+        //     init_cmds_size: 0,
+        // };
+
+        let mut vendor_config = st77916_vendor_config_t::default();
+        vendor_config.flags.set_use_qspi_interface(1);
+
+        // 配置面板参数（修复条纹问题）
+        let panel_config = esp_lcd_panel_dev_config_t {
+            reset_gpio_num: QSPI_PIN_NUM_LCD_RST, // LCD_RST连接到TCA9554扩展IO，暂时不使用
             __bindgen_anon_1: esp_lcd_panel_dev_config_t__bindgen_ty_1 {
-                rgb_ele_order: lcd_rgb_element_order_t_LCD_RGB_ELEMENT_ORDER_RGB, // 恢复RGB顺序
+                rgb_ele_order: lcd_rgb_element_order_t_LCD_RGB_ELEMENT_ORDER_RGB,
             },
-            data_endian: lcd_rgb_data_endian_t_LCD_RGB_DATA_ENDIAN_LITTLE, // 恢复大端
-            bits_per_pixel: 16,
-            flags: esp_lcd_panel_dev_config_t__bindgen_ty_2 {
-                _bitfield_align_1: [],
-                _bitfield_1: Default::default(),
-                __bindgen_padding_0: [0; 3],
-            },
-            vendor_config: &vendor_cfg as *const _ as *mut _,
+            data_endian: lcd_rgb_data_endian_t_LCD_RGB_DATA_ENDIAN_LITTLE,
+            bits_per_pixel: LCD_BIT_PER_PIXEL as u32,
+            flags: esp_lcd_panel_dev_config_t__bindgen_ty_2::default(),
+            vendor_config: &vendor_config as *const _ as *mut _,
         };
 
         unsafe {
             esp!(esp_lcd_new_panel_st77916(
                 io_handle as *mut esp_idf_sys::st77916::esp_lcd_panel_io_t,
-                &panel_cfg as *const _ as *const esp_idf_sys::st77916::esp_lcd_panel_dev_config_t,
-                &mut panel as *mut _ as *mut *mut esp_idf_sys::st77916::esp_lcd_panel_t
+                &panel_config as *const esp_lcd_panel_dev_config_t
+                    as *const esp_idf_sys::st77916::esp_lcd_panel_dev_config_t,
+                &mut panel as *mut esp_lcd_panel_handle_t
+                    as *mut *mut esp_idf_sys::st77916::esp_lcd_panel_t
             ))?;
-            println!("开始面板复位和初始化...");
-            esp!(esp_lcd_panel_reset(panel))?;
-            println!("面板复位完成");
-
-            // 等待复位稳定
-            std::thread::sleep(std::time::Duration::from_millis(200));
-
-            esp!(esp_lcd_panel_init(panel))?;
-            println!("面板初始化完成");
-
-            // 等待初始化稳定
-            std::thread::sleep(std::time::Duration::from_millis(200));
-
-            // 设置显示方向
-            esp!(esp_lcd_panel_mirror(panel, false, false))?;
-            esp!(esp_lcd_panel_swap_xy(panel, false))?;
-            println!("显示方向设置完成");
-
-            // 尝试颜色反转以测试显示
-            esp!(esp_lcd_panel_invert_color(panel, false))?;
-            println!("颜色反转设置完成");
-
-            // 尝试不同的颜色反转
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            esp!(esp_lcd_panel_invert_color(panel, true))?;
-            println!("颜色反转开启");
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            esp!(esp_lcd_panel_invert_color(panel, false))?;
-            println!("颜色反转关闭");
-
-            // 开启显示
-            esp!(esp_lcd_panel_disp_on_off(panel, true))?;
-            println!("显示开启完成");
-
-            // 等待显示稳定
-            std::thread::sleep(std::time::Duration::from_millis(500));
         }
 
         Ok(panel)
     }
 
+    /// 初始化背光控制
     fn init_backlight(
         peripherals: Peripherals,
     ) -> Result<PinDriver<'static, esp_idf_hal::gpio::Gpio5, esp_idf_hal::gpio::Output>> {
-        let mut bl = esp_idf_hal::gpio::PinDriver::output(peripherals.pins.gpio5)?;
-        bl.set_high()?;
-        Ok(bl)
+        let backlight = PinDriver::output(peripherals.pins.gpio5)?;
+        // backlight.set_high()?; // 默认开启背光
+        Ok(backlight)
     }
 
-    pub fn set_mirror(&self, mirror_x: bool, mirror_y: bool) -> Result<()> {
+    /// 启动显示器
+    fn start_display(&self) -> Result<()> {
         unsafe {
-            esp!(esp_lcd_panel_mirror(self.panel, mirror_x, mirror_y))?;
+            esp!(esp_lcd_panel_reset(self.panel))?;
+
+            // 步骤2：初始化面板
+            esp!(esp_lcd_panel_init(self.panel))?;
+
+            esp!(esp_lcd_panel_disp_on_off(self.panel, true))?;
+
+            // 步骤3：设置显示方向（尝试不同配置）
+            esp!(esp_lcd_panel_swap_xy(self.panel, false))?; // 不交换XY轴
+            esp!(esp_lcd_panel_mirror(self.panel, false, false))?; // 不镜像
         }
+
         Ok(())
     }
 
-    pub fn set_swap_xy(&self, swap_xy: bool) -> Result<()> {
-        unsafe {
-            esp!(esp_lcd_panel_swap_xy(self.panel, swap_xy))?;
-        }
-
-        Ok(())
-    }
-
+    /// 绘制位图到指定区域
     pub fn draw_bitmap(
         &self,
-        x: i32,
-        y: i32,
-        width: i32,
-        height: i32,
-        data: *const u16,
+        x_start: i32,
+        y_start: i32,
+        x_end: i32,
+        y_end: i32,
+        color_data: &[u16],
     ) -> Result<()> {
+        if x_start < 0 || y_start < 0 || x_end > LCD_WIDTH || y_end > LCD_HEIGHT {
+            return Err(anyhow::anyhow!("坐标超出屏幕范围"));
+        }
+
+        let expected_len = ((x_end - x_start) * (y_end - y_start)) as usize;
+        if color_data.len() != expected_len {
+            return Err(anyhow::anyhow!("颜色数据长度不匹配"));
+        }
+
         unsafe {
             esp!(esp_lcd_panel_draw_bitmap(
                 self.panel,
-                x,          // x_start
-                y,          // y_start
-                x + width,  // x_end (exclusive)
-                y + height, // y_end (exclusive)
-                data as *const _
+                x_start,
+                y_start,
+                x_end,
+                y_end,
+                color_data.as_ptr() as *const _
             ))?;
         }
+
         Ok(())
     }
 
-    pub fn clear(&self, color: u16) -> Result<()> {
-        // 分块清屏，每次处理一行，避免栈溢出
-        let line_buffer = vec![color; LCD_WIDTH as usize];
-        for y in 0..LCD_HEIGHT {
-            self.draw_bitmap(0, y, LCD_WIDTH, 1, line_buffer.as_ptr())?;
-        }
+    /// 填充整个屏幕（分块传输）
+    pub fn fill_screen(&self, color: u16) -> Result<()> {
+        let color = color.to_le(); // 或 color.to_le()，试试两种
+        let buffer = vec![color; (LCD_WIDTH * LCD_HEIGHT) as usize];
+        self.draw_bitmap(0, 0, LCD_WIDTH, LCD_HEIGHT, &buffer)?;
+
+        println!("fill_screen: 填充完成");
         Ok(())
     }
 
-    pub fn draw_test_pattern(&self) -> Result<()> {
-        // 分行绘制测试图案，避免栈溢出
-        let mut line_buffer = vec![0u16; LCD_WIDTH as usize];
-
-        for y in 0..LCD_HEIGHT {
-            for x in 0..LCD_WIDTH {
-                let color = if x < 120 {
-                    0xF800 // 红色
-                } else if x < 240 {
-                    0x07E0 // 绿色
-                } else {
-                    0x001F // 蓝色
-                };
-                line_buffer[x as usize] = color;
-            }
-            self.draw_bitmap(0, y, LCD_WIDTH, 1, line_buffer.as_ptr())?;
-        }
-        Ok(())
-    }
-
+    /// 设置背光状态
     pub fn set_backlight(&mut self, on: bool) -> Result<()> {
         if on {
             self.backlight.set_high()?;
@@ -244,5 +251,20 @@ impl LcdController {
             self.backlight.set_low()?;
         }
         Ok(())
+    }
+}
+
+impl Drop for LcdController {
+    fn drop(&mut self) {
+        // 清理资源
+        unsafe {
+            if !self.panel.is_null() {
+                esp_lcd_panel_del(self.panel);
+            }
+            if !self.io_handle.is_null() {
+                esp_lcd_panel_io_del(self.io_handle);
+            }
+            spi_bus_free(spi_host_device_t_SPI2_HOST as _);
+        }
     }
 }
