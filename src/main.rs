@@ -36,11 +36,17 @@ fn main() -> Result<()> {
     // 暂停3秒
     lcd.fill_screen(COLOR_BLACK)?;
 
-    // lcd.fill_screen(ColorRe)
-
-    lcd.draw_text("Phoenix.H!", 140, 180, Rgb565::new(31, 63, 31))?;
+    // 播放眼睛动画
+    println!("开始播放眼睛动画...");
 
     loop {
-        FreeRtos::delay_ms(10000);
+        // 播放一轮完整的眼睛动画
+        lcd.play_eye_animation()?;
+
+        // 显示文本
+        lcd.draw_text("Phoenix.H!", 140, 280, Rgb565::new(31, 63, 31))?;
+
+        // 等待3秒后重新开始动画
+        FreeRtos::delay_ms(3000);
     }
 }
