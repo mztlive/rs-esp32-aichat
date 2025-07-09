@@ -2,7 +2,8 @@ use anyhow::Result;
 use esp_idf_hal::gpio::PinDriver;
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_sys::st77916::{
-    esp_lcd_new_panel_st77916, st77916_vendor_config_t, st77916_vendor_config_t__bindgen_ty_1,
+    esp_lcd_new_panel_st77916, st77916_lcd_init_cmd_t, st77916_vendor_config_t,
+    st77916_vendor_config_t__bindgen_ty_1,
 };
 use esp_idf_sys::*;
 use std::ptr;
@@ -146,8 +147,11 @@ impl LcdController {
         //     init_cmds_size: 0,
         // };
 
+        // let st77916_init_cmds = st77916_lcd_init_cmd_t::default();
         let mut vendor_config = st77916_vendor_config_t::default();
         vendor_config.flags.set_use_qspi_interface(1);
+        // vendor_config.init_cmds = &st77916_init_cmds as *const _;
+        // vendor_config.init_cmds_size = st77916_init_cmds.data_bytes;
 
         // 配置面板参数（修复条纹问题）
         let panel_config = esp_lcd_panel_dev_config_t {
