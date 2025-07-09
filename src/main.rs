@@ -19,26 +19,26 @@ fn main() -> Result<()> {
     println!("正在初始化LCD控制器...");
     let mut lcd = LcdController::new(p)?;
 
-    // 开启背光
-    println!("开启背光...");
-    lcd.set_backlight(true)?;
-
     println!("显示纯白色...");
     lcd.fill_screen(COLOR_WHITE)?;
 
-    // 在屏幕中心绘制圆形
-    println!("在屏幕中心绘制圆形...");
-    let center_x = lcd::LCD_WIDTH / 2; // 180
-    let center_y = lcd::LCD_HEIGHT / 2; // 180
+    // 使用embedded-graphics绘制文本
+    println!("绘制文本示例...");
 
-    // 绘制红色实心圆形，半径50
-    lcd.draw_filled_circle(center_x, center_y, 50, COLOR_RED)?;
+    // 绘制白色文本
+    lcd.draw_colored_text("Hello ESP32!", 10, 10, 255, 255, 255)?;
 
-    // 绘制蓝色圆形轮廓，半径70
-    lcd.draw_circle(center_x, center_y, 70, COLOR_BLUE)?;
+    // 绘制红色文本
+    lcd.draw_colored_text("Red Text", 10, 30, 255, 0, 0)?;
 
-    // 绘制绿色圆形轮廓，半径30
-    lcd.draw_circle(center_x, center_y, 30, COLOR_GREEN)?;
+    // 绘制绿色文本
+    lcd.draw_colored_text("Green Text", 10, 50, 0, 255, 0)?;
+
+    // 绘制蓝色文本
+    lcd.draw_colored_text("Blue Text", 10, 70, 0, 0, 255)?;
+
+    // 在屏幕底部绘制信息
+    lcd.draw_colored_text("ESP32 with Rust", 10, 330, 255, 255, 0)?;
 
     // 保持运行
     loop {

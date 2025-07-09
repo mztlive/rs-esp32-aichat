@@ -10,6 +10,16 @@ use std::ptr;
 
 use crate::lcd_cmds::get_vendor_specific_init_new;
 
+// embedded-graphics相关导入
+use embedded_graphics::{
+    draw_target::DrawTarget,
+    geometry::{OriginDimensions, Point, Size},
+    mono_font::{ascii::FONT_6X10, MonoTextStyle},
+    pixelcolor::{Rgb565, RgbColor},
+    text::{Text, TextStyleBuilder},
+    Drawable, Pixel,
+};
+
 // ===================== 常量区 =====================
 // 分辨率 & 像素格式
 pub const LCD_WIDTH: i32 = 360;
@@ -114,7 +124,7 @@ impl LcdController {
             cs_gpio_num: QSPI_PIN_NUM_LCD_CS,
             dc_gpio_num: -1, // QSPI模式不需要DC引脚
             spi_mode: 0,
-            pclk_hz: 3 * 1000 * 1000,
+            pclk_hz: 80 * 1000 * 1000,
             trans_queue_depth: 10,
             on_color_trans_done: None,
             user_ctx: ptr::null_mut(),
@@ -312,7 +322,7 @@ impl LcdController {
 
         for y in -radius..=radius {
             let y_coord = center_y + y;
-            if y_coord < 0 || y_coord >= LCD_HEIGHT {
+            if !(0..LCD_HEIGHT).contains(&y_coord) {
                 continue;
             }
 
@@ -330,6 +340,55 @@ impl LcdController {
         }
 
         Ok(())
+    }
+
+    /// 使用embedded-graphics绘制文本
+    pub fn draw_text(&mut self, text: &str, x: i32, y: i32, color: Rgb565) -> Result<()> {
+        let character_style = MonoTextStyle::new(&FONT_6X10, color);
+        let text_style = TextStyleBuilder::new().build();
+
+        let text_obj = Text::with_text_style(text, Point::new(x, y), character_style, text_style);
+        text_obj.draw(self)?;
+        Ok(())
+    }
+
+    /// 使用embedded-graphics绘制彩色文本（方便方法）
+    pub fn draw_colored_text(
+        &mut self,
+        text: &str,
+        x: i32,
+        y: i32,
+        r: u8,
+        g: u8,
+        b: u8,
+    ) -> Result<()> {
+        let color = Rgb565::new(r >> 3, g >> 2, b >> 3);
+        self.draw_text(text, x, y, color)
+    }
+}
+
+// 为LcdController实现embedded-graphics的DrawTarget trait
+impl DrawTarget for LcdController {
+    type Color = Rgb565;
+    type Error = anyhow::Error;
+
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = Pixel<Self::Color>>,
+    {
+        for Pixel(coord, color) in pixels {
+            // 将Rgb565转换为RGB565格式的u16值
+            let color_u16 =
+                ((color.r() as u16) << 11) | ((color.g() as u16) << 5) | (color.b() as u16);
+            self.draw_pixel(coord.x, coord.y, color_u16)?;
+        }
+        Ok(())
+    }
+}
+
+impl OriginDimensions for LcdController {
+    fn size(&self) -> Size {
+        Size::new(LCD_WIDTH as u32, LCD_HEIGHT as u32)
     }
 }
 
