@@ -8,6 +8,8 @@ use esp_idf_sys::st77916::{
 use esp_idf_sys::*;
 use std::ptr;
 
+use crate::lcd_cmds::get_vendor_specific_init_new;
+
 // ===================== 常量区 =====================
 // 分辨率 & 像素格式
 pub const LCD_WIDTH: i32 = 360;
@@ -147,11 +149,11 @@ impl LcdController {
         //     init_cmds_size: 0,
         // };
 
-        // let st77916_init_cmds = st77916_lcd_init_cmd_t::default();
+        let st77916_init_cmds = get_vendor_specific_init_new();
         let mut vendor_config = st77916_vendor_config_t::default();
         vendor_config.flags.set_use_qspi_interface(1);
-        // vendor_config.init_cmds = &st77916_init_cmds as *const _;
-        // vendor_config.init_cmds_size = st77916_init_cmds.data_bytes;
+        vendor_config.init_cmds = st77916_init_cmds.as_ptr() as *const _;
+        vendor_config.init_cmds_size = st77916_init_cmds.len() as u16;
 
         // 配置面板参数（修复条纹问题）
         let panel_config = esp_lcd_panel_dev_config_t {
@@ -159,7 +161,7 @@ impl LcdController {
             __bindgen_anon_1: esp_lcd_panel_dev_config_t__bindgen_ty_1 {
                 rgb_ele_order: lcd_rgb_element_order_t_LCD_RGB_ELEMENT_ORDER_RGB,
             },
-            data_endian: lcd_rgb_data_endian_t_LCD_RGB_DATA_ENDIAN_LITTLE,
+            data_endian: lcd_rgb_data_endian_t_LCD_RGB_DATA_ENDIAN_BIG,
             bits_per_pixel: LCD_BIT_PER_PIXEL as u32,
             flags: esp_lcd_panel_dev_config_t__bindgen_ty_2::default(),
             vendor_config: &vendor_config as *const _ as *mut _,
@@ -239,7 +241,7 @@ impl LcdController {
 
     /// 填充整个屏幕（分块传输）
     pub fn fill_screen(&self, color: u16) -> Result<()> {
-        let color = color.to_le(); // 或 color.to_le()，试试两种
+        let color = color.to_be();
         let buffer = vec![color; (LCD_WIDTH * LCD_HEIGHT) as usize];
         self.draw_bitmap(0, 0, LCD_WIDTH, LCD_HEIGHT, &buffer)?;
 

@@ -3,6 +3,7 @@ use anyhow::Result;
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 
 mod lcd;
+mod lcd_cmds;
 use lcd::{LcdController, COLOR_BLUE, COLOR_GREEN, COLOR_RED, COLOR_WHITE};
 
 fn main() -> Result<()> {
