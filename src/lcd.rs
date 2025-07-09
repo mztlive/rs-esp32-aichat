@@ -1,4 +1,5 @@
 use anyhow::Result;
+use embedded_graphics::mono_font::jis_x0201::FONT_10X20;
 use esp_idf_hal::gpio::PinDriver;
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_sys::st77916::{
@@ -193,18 +194,25 @@ impl LcdController {
         unsafe {
             esp!(esp_lcd_panel_reset(self.panel))?;
 
+            // 等待重置完成
+            std::thread::sleep(std::time::Duration::from_millis(120));
+
             // 步骤2：初始化面板
             esp!(esp_lcd_panel_init(self.panel))?;
-
-            esp!(esp_lcd_panel_disp_on_off(self.panel, true))?;
 
             // 步骤3：设置显示方向（尝试不同配置）
             esp!(esp_lcd_panel_swap_xy(self.panel, false))?; // 不交换XY轴
             esp!(esp_lcd_panel_mirror(self.panel, false, false))?; // 不镜像
-        }
 
-        // 步骤4：清除显示器内容，确保干净的显示
-        self.fill_screen(COLOR_BLACK)?;
+            // 步骤4：先关闭显示，清除GRAM，再开启显示
+            esp!(esp_lcd_panel_disp_on_off(self.panel, false))?;
+            std::thread::sleep(std::time::Duration::from_millis(50));
+
+            // 清除显示器内容，确保干净的显示
+            self.fill_screen(COLOR_BLACK)?;
+
+            esp!(esp_lcd_panel_disp_on_off(self.panel, true))?;
+        }
 
         Ok(())
     }
@@ -351,7 +359,7 @@ impl LcdController {
 
     /// 使用embedded-graphics绘制文本
     pub fn draw_text(&mut self, text: &str, x: i32, y: i32, color: Rgb565) -> Result<()> {
-        let character_style = MonoTextStyle::new(&FONT_6X10, color);
+        let character_style = MonoTextStyle::new(&FONT_10X20, color);
         let text_style = TextStyleBuilder::new().build();
 
         let text_obj = Text::with_text_style(text, Point::new(x, y), character_style, text_style);

@@ -38,7 +38,7 @@ fn main() -> Result<()> {
 
     // lcd.fill_screen(ColorRe)
 
-    lcd.draw_text("Hello ESP32!", 180, 180, Rgb565::new(31, 63, 31))?;
+    lcd.draw_text("Phoenix.H!", 140, 180, Rgb565::new(31, 63, 31))?;
 
     loop {
         FreeRtos::delay_ms(10000);
