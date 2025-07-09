@@ -23,21 +23,22 @@ fn main() -> Result<()> {
     println!("开启背光...");
     lcd.set_backlight(true)?;
 
-    // 简单纯色测试
-    println!("显示纯红色...");
-    lcd.fill_screen(COLOR_RED)?;
-    FreeRtos::delay_ms(2000);
-
-    println!("显示纯绿色...");
-    lcd.fill_screen(COLOR_GREEN)?;
-    FreeRtos::delay_ms(2000);
-
-    println!("显示纯蓝色...");
-    lcd.fill_screen(COLOR_BLUE)?;
-    FreeRtos::delay_ms(2000);
-
     println!("显示纯白色...");
     lcd.fill_screen(COLOR_WHITE)?;
+
+    // 在屏幕中心绘制圆形
+    println!("在屏幕中心绘制圆形...");
+    let center_x = lcd::LCD_WIDTH / 2; // 180
+    let center_y = lcd::LCD_HEIGHT / 2; // 180
+
+    // 绘制红色实心圆形，半径50
+    lcd.draw_filled_circle(center_x, center_y, 50, COLOR_RED)?;
+
+    // 绘制蓝色圆形轮廓，半径70
+    lcd.draw_circle(center_x, center_y, 70, COLOR_BLUE)?;
+
+    // 绘制绿色圆形轮廓，半径30
+    lcd.draw_circle(center_x, center_y, 30, COLOR_GREEN)?;
 
     // 保持运行
     loop {

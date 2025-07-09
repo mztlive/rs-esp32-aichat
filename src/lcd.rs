@@ -138,17 +138,6 @@ impl LcdController {
     fn create_panel(io_handle: esp_lcd_panel_io_handle_t) -> Result<esp_lcd_panel_handle_t> {
         let mut panel: esp_lcd_panel_handle_t = ptr::null_mut();
 
-        // 配置ST77916供应商特定参数（恢复QSPI）
-        // let vendor_config = st77916_vendor_config_t {
-        //     flags: st77916_vendor_config_t__bindgen_ty_1 {
-        //         _bitfield_align_1: [],
-        //         _bitfield_1: st77916_vendor_config_t__bindgen_ty_1::new_bitfield_1(1), // use_qspi_interface = 1，启用QSPI
-        //         __bindgen_padding_0: [0; 3],
-        //     },
-        //     init_cmds: ptr::null(), // 使用默认初始化命令
-        //     init_cmds_size: 0,
-        // };
-
         let st77916_init_cmds = get_vendor_specific_init_new();
         let mut vendor_config = st77916_vendor_config_t::default();
         vendor_config.flags.set_use_qspi_interface(1);
@@ -184,8 +173,8 @@ impl LcdController {
     fn init_backlight(
         peripherals: Peripherals,
     ) -> Result<PinDriver<'static, esp_idf_hal::gpio::Gpio5, esp_idf_hal::gpio::Output>> {
-        let backlight = PinDriver::output(peripherals.pins.gpio5)?;
-        // backlight.set_high()?; // 默认开启背光
+        let mut backlight = PinDriver::output(peripherals.pins.gpio5)?;
+        backlight.set_high()?; // 默认开启背光
         Ok(backlight)
     }
 
@@ -256,6 +245,90 @@ impl LcdController {
         } else {
             self.backlight.set_low()?;
         }
+        Ok(())
+    }
+
+    /// 绘制单个像素
+    pub fn draw_pixel(&self, x: i32, y: i32, color: u16) -> Result<()> {
+        if x < 0 || y < 0 || x >= LCD_WIDTH || y >= LCD_HEIGHT {
+            return Ok(()); // 超出边界直接返回
+        }
+
+        let color = color.to_be();
+        let buffer = [color];
+        self.draw_bitmap(x, y, x + 1, y + 1, &buffer)?;
+        Ok(())
+    }
+
+    /// 绘制圆形（使用Bresenham算法）
+    pub fn draw_circle(&self, center_x: i32, center_y: i32, radius: i32, color: u16) -> Result<()> {
+        if radius <= 0 {
+            return Ok(());
+        }
+
+        let mut x = 0;
+        let mut y = radius;
+        let mut decision = 1 - radius;
+
+        // 绘制中心点
+        self.draw_pixel(center_x, center_y, color)?;
+
+        while x <= y {
+            // 绘制八个对称点
+            self.draw_pixel(center_x + x, center_y + y, color)?;
+            self.draw_pixel(center_x - x, center_y + y, color)?;
+            self.draw_pixel(center_x + x, center_y - y, color)?;
+            self.draw_pixel(center_x - x, center_y - y, color)?;
+            self.draw_pixel(center_x + y, center_y + x, color)?;
+            self.draw_pixel(center_x - y, center_y + x, color)?;
+            self.draw_pixel(center_x + y, center_y - x, color)?;
+            self.draw_pixel(center_x - y, center_y - x, color)?;
+
+            x += 1;
+            if decision < 0 {
+                decision += 2 * x + 1;
+            } else {
+                y -= 1;
+                decision += 2 * (x - y) + 1;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 绘制实心圆形（填充）
+    pub fn draw_filled_circle(
+        &self,
+        center_x: i32,
+        center_y: i32,
+        radius: i32,
+        color: u16,
+    ) -> Result<()> {
+        if radius <= 0 {
+            return Ok(());
+        }
+
+        let color = color.to_be();
+
+        for y in -radius..=radius {
+            let y_coord = center_y + y;
+            if y_coord < 0 || y_coord >= LCD_HEIGHT {
+                continue;
+            }
+
+            // 计算当前行的半宽
+            let half_width = ((radius * radius - y * y) as f32).sqrt() as i32;
+
+            let x_start = (center_x - half_width).max(0);
+            let x_end = (center_x + half_width + 1).min(LCD_WIDTH);
+
+            if x_start < x_end {
+                let line_width = (x_end - x_start) as usize;
+                let line_buffer = vec![color; line_width];
+                self.draw_bitmap(x_start, y_coord, x_end, y_coord + 1, &line_buffer)?;
+            }
+        }
+
         Ok(())
     }
 }
