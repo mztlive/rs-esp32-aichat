@@ -105,43 +105,6 @@ impl<'a> LcdGraphics<'a> {
         Ok(())
     }
 
-    /// 绘制平滑文本（使用背景色进行简单的抗锯齿）
-    pub fn draw_smooth_text(
-        &mut self,
-        text: &str,
-        x: i32,
-        y: i32,
-        fg_color: Rgb565,
-        bg_color: Rgb565,
-    ) -> Result<()> {
-        // 先绘制背景色的文本作为阴影（偏移1像素）
-        let shadow_color = Rgb565::new(
-            (fg_color.r() + bg_color.r()) / 2,
-            (fg_color.g() + bg_color.g()) / 2,
-            (fg_color.b() + bg_color.b()) / 2,
-        );
-
-        self.draw_text(text, x + 1, y + 1, shadow_color)?;
-
-        // 再绘制前景色的文本
-        self.draw_text(text, x, y, fg_color)?;
-        Ok(())
-    }
-
-    /// 使用embedded-graphics绘制彩色文本（方便方法）
-    pub fn draw_colored_text(
-        &mut self,
-        text: &str,
-        x: i32,
-        y: i32,
-        r: u8,
-        g: u8,
-        b: u8,
-    ) -> Result<()> {
-        let color = Rgb565::new(r >> 3, g >> 2, b >> 3);
-        self.draw_text(text, x, y, color)
-    }
-
     /// 绘制一个眼睛
     pub fn draw_eye(&self, center_x: i32, center_y: i32, eye_size: i32) -> Result<()> {
         // 眼球半径
