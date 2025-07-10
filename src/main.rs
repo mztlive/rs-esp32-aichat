@@ -9,7 +9,10 @@ mod lcd_cmds;
 use lcd::LcdController;
 use tinybmp::Bmp;
 
-use crate::graphics::{colors::WHITE, primitives::GraphicsPrimitives};
+use crate::graphics::{
+    colors::{BLUE, WHITE},
+    primitives::GraphicsPrimitives,
+};
 
 // 定义donghua动画图片数据数组
 const DONGHUA_IMAGES: [&[u8]; 12] = [
@@ -49,6 +52,7 @@ fn main() -> Result<()> {
     let mut primitives = GraphicsPrimitives::new(&mut lcd);
 
     primitives.fill_screen(WHITE)?;
+    draw_debug_grid!(primitives, BLUE);
 
     // println!("StatusBar已绘制完成！");
 
