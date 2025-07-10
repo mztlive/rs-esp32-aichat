@@ -1,4 +1,4 @@
-use super::traits::{BatchDrawableUIComponent, DrawCommand, UIComponent};
+use super::traits::UIComponent;
 use crate::graphics::layout::{SCREEN_WIDTH, STATUS_BAR, TEXT_CHAR_WIDTH, TEXT_LINE_HEIGHT};
 use crate::graphics::primitives::GraphicsPrimitives;
 use anyhow::Result;
@@ -154,33 +154,5 @@ impl UIComponent for StatusBar {
 
     fn get_bounds(&self) -> (i32, i32, i32, i32) {
         (STATUS_BAR.x, STATUS_BAR.y, STATUS_BAR.width, self.height)
-    }
-}
-
-impl BatchDrawableUIComponent for StatusBar {
-    fn generate_draw_commands(&self) -> Vec<DrawCommand> {
-        let mut commands = Vec::new();
-
-        // 添加背景绘制命令
-        commands.push(DrawCommand::FillRect {
-            x: STATUS_BAR.x,
-            y: STATUS_BAR.y,
-            width: STATUS_BAR.width,
-            height: self.height,
-            color: self.background_color,
-        });
-
-        // 添加文本绘制命令
-        for item in &self.text_items {
-            let (x, y) = self.calculate_text_position(&item.text, item.position);
-            commands.push(DrawCommand::DrawText {
-                text: item.text.clone(),
-                x,
-                y,
-                color: item.color,
-            });
-        }
-
-        commands
     }
 }
