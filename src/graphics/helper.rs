@@ -15,13 +15,19 @@ use embedded_graphics::pixelcolor::Rgb565;
 /// # 返回值
 ///
 /// 返回文本左上角的坐标 (x, y)
-pub fn center_text_in_area(text: &str, area_x: i32, area_y: i32, area_width: i32, area_height: i32) -> (i32, i32) {
+pub fn center_text_in_area(
+    text: &str,
+    area_x: i32,
+    area_y: i32,
+    area_width: i32,
+    area_height: i32,
+) -> (i32, i32) {
     let text_width = text.len() as i32 * 10; // 每个字符10像素宽
     let text_height = 20; // 字体高度20像素
-    
+
     let text_x = area_x + (area_width - text_width) / 2;
     let text_y = area_y + (area_height - text_height) / 2;
-    
+
     (text_x, text_y)
 }
 
@@ -39,10 +45,17 @@ pub fn center_text_in_area(text: &str, area_x: i32, area_y: i32, area_width: i32
 /// # 返回值
 ///
 /// 返回图像左上角的坐标 (x, y)
-pub fn center_image_in_area(image_width: i32, image_height: i32, area_x: i32, area_y: i32, area_width: i32, area_height: i32) -> (i32, i32) {
+pub fn center_image_in_area(
+    image_width: i32,
+    image_height: i32,
+    area_x: i32,
+    area_y: i32,
+    area_width: i32,
+    area_height: i32,
+) -> (i32, i32) {
     let image_x = area_x + (area_width - image_width) / 2;
     let image_y = area_y + (area_height - image_height) / 2;
-    
+
     (image_x, image_y)
 }
 
@@ -61,7 +74,7 @@ pub fn rgb_to_rgb565(r: u8, g: u8, b: u8) -> Rgb565 {
     let r5 = (r as u16 * 31 / 255) as u8;
     let g6 = (g as u16 * 63 / 255) as u8;
     let b5 = (b as u16 * 31 / 255) as u8;
-    
+
     Rgb565::new(r5, g6, b5)
 }
 
@@ -78,7 +91,7 @@ pub fn hex_to_rgb565(hex: u32) -> Rgb565 {
     let r = ((hex >> 16) & 0xFF) as u8;
     let g = ((hex >> 8) & 0xFF) as u8;
     let b = (hex & 0xFF) as u8;
-    
+
     rgb_to_rgb565(r, g, b)
 }
 
@@ -96,7 +109,14 @@ pub fn hex_to_rgb565(hex: u32) -> Rgb565 {
 /// # 返回值
 ///
 /// 如果坐标在区域内返回true，否则返回false
-pub fn is_point_in_area(x: i32, y: i32, area_x: i32, area_y: i32, area_width: i32, area_height: i32) -> bool {
+pub fn is_point_in_area(
+    x: i32,
+    y: i32,
+    area_x: i32,
+    area_y: i32,
+    area_width: i32,
+    area_height: i32,
+) -> bool {
     x >= area_x && x < area_x + area_width && y >= area_y && y < area_y + area_height
 }
 
@@ -196,14 +216,14 @@ pub fn map_range(value: f32, from_min: f32, from_max: f32, to_min: f32, to_max: 
 macro_rules! draw_debug_grid {
     ($graphics:expr, $color:expr) => {
         use crate::graphics::layout::GRID_SIZE;
-        
+
         // 绘制垂直线
         for i in 0..4 {
             let x = i * GRID_SIZE;
             let rect = crate::graphics::layout::ScreenRect::new(x, 0, 1, 360);
             $graphics.fill_rect(&rect, $color)?;
         }
-        
+
         // 绘制水平线
         for i in 0..4 {
             let y = i * GRID_SIZE;
@@ -220,7 +240,7 @@ macro_rules! draw_debug_grid {
 macro_rules! draw_grid_numbers {
     ($graphics:expr, $color:expr) => {
         use crate::graphics::layout::GridPosition;
-        
+
         $graphics.draw_text_at_grid(GridPosition::TopLeft, "1", $color)?;
         $graphics.draw_text_at_grid(GridPosition::TopCenter, "2", $color)?;
         $graphics.draw_text_at_grid(GridPosition::TopRight, "3", $color)?;
