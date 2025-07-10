@@ -165,9 +165,16 @@ impl<'a> GraphicsPrimitives<'a> {
     /// let white = Rgb565::new(31, 63, 31);
     /// graphics.draw_text("Hello, ESP32!", 10, 30, white)?;
     /// ```
-    pub fn draw_text(&mut self, text: &str, x: i32, y: i32, color: Rgb565) -> Result<()> {
+    pub fn draw_text(
+        &mut self,
+        text: &str,
+        x: i32,
+        y: i32,
+        color: Rgb565,
+        background_color: Option<Rgb565>,
+    ) -> Result<()> {
         let mut character_style = MonoTextStyle::new(&FONT_10X20, color);
-        character_style.set_background_color(Some(WHITE));
+        character_style.set_background_color(background_color);
 
         let text_style = TextStyleBuilder::new().build();
 
@@ -267,6 +274,7 @@ impl<'a> GraphicsPrimitives<'a> {
         position: GridPosition,
         text: &str,
         color: Rgb565,
+        background_color: Option<Rgb565>,
     ) -> Result<()> {
         let (center_x, center_y) = position.get_center();
 
@@ -277,7 +285,7 @@ impl<'a> GraphicsPrimitives<'a> {
         let text_x = center_x - text_width / 2;
         let text_y = center_y - text_height / 2;
 
-        self.draw_text(text, text_x, text_y, color)
+        self.draw_text(text, text_x, text_y, color, background_color)
     }
 
     /// 在九宫格指定位置绘制图像
@@ -420,7 +428,12 @@ impl<'a> GraphicsPrimitives<'a> {
     /// // 在屏幕中心绘制文本
     /// graphics.draw_text_at_center("ESP32", BLACK)?;
     /// ```
-    pub fn draw_text_at_center(&mut self, text: &str, color: Rgb565) -> Result<()> {
+    pub fn draw_text_at_center(
+        &mut self,
+        text: &str,
+        color: Rgb565,
+        background_color: Option<Rgb565>,
+    ) -> Result<()> {
         use crate::graphics::layout::{SCREEN_CENTER_X, SCREEN_CENTER_Y};
 
         // 计算文本尺寸并调整位置使其居中
@@ -430,7 +443,7 @@ impl<'a> GraphicsPrimitives<'a> {
         let text_x = SCREEN_CENTER_X - text_width / 2;
         let text_y = SCREEN_CENTER_Y - text_height / 2;
 
-        self.draw_text(text, text_x, text_y, color)
+        self.draw_text(text, text_x, text_y, color, background_color)
     }
 
     /// 在指定位置绘制多行文本
@@ -458,12 +471,13 @@ impl<'a> GraphicsPrimitives<'a> {
         start_x: i32,
         start_y: i32,
         color: Rgb565,
+        background_color: Option<Rgb565>,
     ) -> Result<()> {
         use crate::graphics::layout::TEXT_LINE_HEIGHT;
 
         for (i, line) in lines.iter().enumerate() {
             let y = start_y + i as i32 * TEXT_LINE_HEIGHT;
-            self.draw_text(line, start_x, y, color)?;
+            self.draw_text(line, start_x, y, color, background_color)?;
         }
         Ok(())
     }

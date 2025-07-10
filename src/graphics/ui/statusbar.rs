@@ -18,6 +18,7 @@ pub struct StatusBarText {
     pub text: String,
     pub position: StatusBarPosition,
     pub color: Rgb565,
+    pub background_color: Option<Rgb565>,
 }
 
 /// 状态栏组件
@@ -64,11 +65,13 @@ impl StatusBar {
         text: impl Into<String>,
         position: StatusBarPosition,
         color: Rgb565,
+        background_color: Option<Rgb565>,
     ) {
         self.text_items.push(StatusBarText {
             text: text.into(),
             position,
             color,
+            background_color,
         });
     }
 
@@ -146,7 +149,7 @@ impl UIComponent for StatusBar {
         // 绘制所有文本项
         for item in &self.text_items {
             let (x, y) = self.calculate_text_position(&item.text, item.position);
-            graphics.draw_text(&item.text, x, y, item.color)?;
+            graphics.draw_text(&item.text, x, y, item.color, item.background_color)?;
         }
 
         Ok(())

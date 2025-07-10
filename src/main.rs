@@ -41,9 +41,9 @@ fn main() -> Result<()> {
 
     // 创建StatusBar
     let mut statusbar = StatusBar::new(BLUE);
-    statusbar.add_text("12:34", StatusBarPosition::Left, WHITE);
-    statusbar.add_text("ESP32-RS", StatusBarPosition::Center, WHITE);
-    statusbar.add_text("100%", StatusBarPosition::Right, WHITE);
+    statusbar.add_text("12:34", StatusBarPosition::Left, WHITE, Some(BLUE));
+    statusbar.add_text("ESP32-RS", StatusBarPosition::Center, WHITE, Some(BLUE));
+    statusbar.add_text("100%", StatusBarPosition::Right, WHITE, Some(BLUE));
 
     // 使用UI组件直接绘制
     primitives.draw_component(&statusbar)?;
