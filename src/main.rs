@@ -2,9 +2,11 @@
 use anyhow::Result;
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 
+mod graphics;
 mod lcd;
 mod lcd_cmds;
 mod lcd_graphics;
+mod ui;
 use embedded_graphics::pixelcolor::Rgb565;
 use lcd::{LcdController, COLOR_BLACK, COLOR_RED, COLOR_WHITE};
 use lcd_graphics::LcdGraphics;
