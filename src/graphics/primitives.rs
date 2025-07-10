@@ -14,6 +14,7 @@ use crate::{
     graphics::{
         colors::WHITE,
         layout::{GridPosition, ScreenRect},
+        ui::traits::{UIComponent, BatchDrawableUIComponent, DrawCommand},
     },
     lcd::{LcdController, LCD_HEIGHT, LCD_WIDTH},
 };
@@ -535,5 +536,97 @@ impl<'a> GraphicsPrimitives<'a> {
         let (top_left_x, top_left_y) = position.get_top_left();
         let rect = ScreenRect::new(top_left_x, top_left_y, GRID_SIZE, GRID_SIZE);
         self.fill_rect(&rect, color)
+    }
+
+    /// 绘制UI组件
+    ///
+    /// 使用UI组件的render方法来绘制组件。
+    ///
+    /// # 参数
+    ///
+    /// * `component` - 实现了UIComponent trait的组件
+    ///
+    /// # 返回值
+    ///
+    /// * `Ok(())` - 绘制成功
+    /// * `Err(anyhow::Error)` - 绘制失败
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use crate::graphics::ui::StatusBar;
+    /// use crate::graphics::colors::WHITE;
+    ///
+    /// let mut statusbar = StatusBar::new(WHITE);
+    /// statusbar.add_text("Hello", StatusBarPosition::Left, BLACK);
+    /// graphics.draw_component(&statusbar)?;
+    /// ```
+    pub fn draw_component<T: UIComponent>(&mut self, component: &T) -> Result<()> {
+        component.render(self)
+    }
+
+    /// 批量绘制UI组件
+    ///
+    /// 使用批量绘制命令来优化性能，一次性执行多个绘制操作。
+    ///
+    /// # 参数
+    ///
+    /// * `component` - 实现了BatchDrawableUIComponent trait的组件
+    ///
+    /// # 返回值
+    ///
+    /// * `Ok(())` - 绘制成功
+    /// * `Err(anyhow::Error)` - 绘制失败
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use crate::graphics::ui::StatusBar;
+    /// use crate::graphics::colors::WHITE;
+    ///
+    /// let mut statusbar = StatusBar::new(WHITE);
+    /// statusbar.add_text("Hello", StatusBarPosition::Left, BLACK);
+    /// graphics.draw_component_batch(&statusbar)?;
+    /// ```
+    pub fn draw_component_batch<T: BatchDrawableUIComponent>(&mut self, component: &T) -> Result<()> {
+        let commands = component.generate_draw_commands();
+        self.execute_draw_commands(&commands)
+    }
+
+    /// 执行绘制命令列表
+    ///
+    /// 批量执行绘制命令，用于优化绘制性能。
+    ///
+    /// # 参数
+    ///
+    /// * `commands` - 绘制命令列表
+    ///
+    /// # 返回值
+    ///
+    /// * `Ok(())` - 执行成功
+    /// * `Err(anyhow::Error)` - 执行失败
+    pub fn execute_draw_commands(&mut self, commands: &[DrawCommand]) -> Result<()> {
+        for command in commands {
+            match command {
+                DrawCommand::FillRect { x, y, width, height, color } => {
+                    let rect = ScreenRect::new(*x, *y, *width, *height);
+                    self.fill_rect(&rect, *color)?;
+                }
+                DrawCommand::DrawText { text, x, y, color } => {
+                    self.draw_text(text, *x, *y, *color)?;
+                }
+                DrawCommand::FillCircle { center_x, center_y, radius, color } => {
+                    self.draw_filled_circle(*center_x, *center_y, *radius, *color)?;
+                }
+                DrawCommand::DrawCircleBorder { center_x, center_y, radius, color, thickness } => {
+                    self.draw_circle_border(*center_x, *center_y, *radius, *color, *thickness)?;
+                }
+                DrawCommand::DrawRectBorder { x, y, width, height, color, thickness } => {
+                    let rect = ScreenRect::new(*x, *y, *width, *height);
+                    self.draw_rect_border(&rect, *color, *thickness)?;
+                }
+            }
+        }
+        Ok(())
     }
 }

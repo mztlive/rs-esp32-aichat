@@ -209,9 +209,9 @@ impl LcdController {
         y_end: i32,
         color_data: &[u16],
     ) -> Result<()> {
-        if x_start < 0 || y_start < 0 || x_end > LCD_WIDTH || y_end > LCD_HEIGHT {
-            return Err(anyhow::anyhow!("坐标超出屏幕范围"));
-        }
+        // if x_start < 0 || y_start < 0 || x_end > LCD_WIDTH || y_end > LCD_HEIGHT {
+        //     return Err(anyhow::anyhow!("坐标超出屏幕范围"));
+        // }
 
         let expected_len = ((x_end - x_start) * (y_end - y_start)) as usize;
         if color_data.len() != expected_len {
