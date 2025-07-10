@@ -155,7 +155,7 @@ impl LcdController {
         let panel_config = esp_lcd_panel_dev_config_t {
             reset_gpio_num: QSPI_PIN_NUM_LCD_RST, // LCD_RST连接到TCA9554扩展IO，暂时不使用
             __bindgen_anon_1: esp_lcd_panel_dev_config_t__bindgen_ty_1 {
-                rgb_ele_order: lcd_rgb_element_order_t_LCD_RGB_ELEMENT_ORDER_BGR,
+                rgb_ele_order: lcd_rgb_element_order_t_LCD_RGB_ELEMENT_ORDER_RGB,
             },
             data_endian: lcd_rgb_data_endian_t_LCD_RGB_DATA_ENDIAN_BIG,
             bits_per_pixel: LCD_BIT_PER_PIXEL as u32,
@@ -308,9 +308,11 @@ impl DrawTarget for LcdController {
             max_x = max_x.max(coord.x);
             max_y = max_y.max(coord.y);
 
-            // 将Rgb565转换为RGB565格式的u16值
+            // 将Rgb565转换为RGB565格式的u16值，考虑大端序
             let color_u16 =
                 ((color.r() as u16) << 11) | ((color.g() as u16) << 5) | (color.b() as u16);
+
+            let color_u16 = color_u16.swap_bytes(); // 大端序需要交换字节
 
             pixel_data.push((coord, color_u16));
         }

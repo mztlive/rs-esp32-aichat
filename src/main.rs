@@ -10,7 +10,7 @@ use tinybmp::Bmp;
 
 use crate::{
     graphics::{
-        colors::{get_all_colors, BLUE, RED},
+        colors::{get_all_colors, BLUE, GREEN, RED, YELLOW},
         primitives::GraphicsPrimitives,
     },
     lcd::COLOR_RED,
@@ -39,6 +39,18 @@ fn main() -> Result<()> {
 
     loop {
         primitives.fill_screen(BLUE)?;
+
+        FreeRtos::delay_ms(1000);
+
+        primitives.fill_screen(RED)?;
+
+        FreeRtos::delay_ms(1000);
+
+        primitives.fill_screen(GREEN)?;
+
+        FreeRtos::delay_ms(1000);
+
+        primitives.fill_screen(YELLOW)?;
 
         // primitives.draw_image(&bmp, 100, 100)?;
 
