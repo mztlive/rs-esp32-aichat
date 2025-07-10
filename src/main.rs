@@ -10,6 +10,7 @@ use lcd::LcdController;
 use tinybmp::Bmp;
 
 use crate::graphics::{
+    animation::FrameAnimation,
     colors::{BLUE, WHITE},
     primitives::GraphicsPrimitives,
 };
@@ -56,22 +57,31 @@ fn main() -> Result<()> {
 
     // println!("StatusBar已绘制完成！");
 
-    let bmps = DONGHUA_IMAGES
-        .iter()
-        .map(|&img| {
-            // 解析 BMP 文件
-            Bmp::<Rgb565>::from_slice(img).unwrap()
-        })
-        .collect::<Vec<_>>();
+    // 创建动画系统，设置帧率为12.5fps (80ms每帧)
+    let mut animation = FrameAnimation::with_fps(12);
 
+    // 添加所有动画帧
+    for &frame_data in &DONGHUA_IMAGES {
+        animation.add_frame(frame_data);
+    }
+
+    // 主循环
     loop {
-        for bmp in &bmps {
-            primitives
-                .draw_image_at_grid(graphics::layout::GridPosition::MiddleCenter, bmp)
-                .unwrap();
+        // 更新动画状态，使用硬件定时器自动计算时间差
+        if animation.update() {
+            // 帧发生变化，获取当前帧数据并绘制
+            if let Some(frame_data) = animation.get_current_frame() {
+                // 解析 BMP 文件
+                let bmp = Bmp::<Rgb565>::from_slice(frame_data).unwrap();
 
-            // 添加延迟让动画更流畅，每帧间隔80ms
-            FreeRtos::delay_ms(80);
+                // 绘制当前帧
+                primitives
+                    .draw_image_at_grid(graphics::layout::GridPosition::MiddleCenter, &bmp)
+                    .unwrap();
+            }
         }
+
+        // 使用较短的延迟，让动画更平滑
+        FreeRtos::delay_ms(1);
     }
 }
