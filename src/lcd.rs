@@ -293,19 +293,14 @@ impl DrawTarget for LcdController {
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
-        // 收集所有有效像素并计算边界框
-        let mut min_x = LCD_WIDTH;
-        let mut min_y = LCD_HEIGHT;
-        let mut max_x = -1;
-        let mut max_y = -1;
+        // 收集所有像素并计算边界框
+        let mut min_x = i32::MAX;
+        let mut min_y = i32::MAX;
+        let mut max_x = i32::MIN;
+        let mut max_y = i32::MIN;
         let mut pixel_data = Vec::new();
 
         for Pixel(coord, color) in pixels {
-            // 边界检查
-            if coord.x < 0 || coord.y < 0 || coord.x >= LCD_WIDTH || coord.y >= LCD_HEIGHT {
-                continue;
-            }
-
             // 更新边界框
             min_x = min_x.min(coord.x);
             min_y = min_y.min(coord.y);
@@ -319,7 +314,7 @@ impl DrawTarget for LcdController {
             pixel_data.push((coord, color_u16));
         }
 
-        // 如果没有有效像素，直接返回
+        // 如果没有像素，直接返回
         if pixel_data.is_empty() {
             return Ok(());
         }

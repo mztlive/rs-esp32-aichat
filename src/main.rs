@@ -5,14 +5,9 @@ use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 mod graphics;
 mod lcd;
 mod lcd_cmds;
-mod ui;
-use embedded_graphics::pixelcolor::Rgb565;
 use lcd::{LcdController, COLOR_BLACK, COLOR_RED, COLOR_WHITE};
 
-use crate::{
-    graphics::{primitives::GraphicsPrimitives, rgb565_from_u16},
-    ui::{eye::Eye, eye_animation::EyeAnimator},
-};
+use crate::graphics::{primitives::GraphicsPrimitives, rgb565_from_u16};
 
 fn main() -> Result<()> {
     // 必须先调用，打补丁

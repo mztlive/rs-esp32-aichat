@@ -57,9 +57,4 @@ impl<'a> GraphicsPrimitives<'a> {
     pub fn fill_screen(&self, color: u16) -> Result<()> {
         self.lcd.fill_screen(color)
     }
-
-    /// 绘制位图
-    pub fn draw_bitmap(&self, x: i32, y: i32, x_end: i32, y_end: i32, data: &[u16]) -> Result<()> {
-        self.lcd.draw_bitmap(x, y, x_end, y_end, data)
-    }
 }
