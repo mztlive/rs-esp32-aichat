@@ -5,12 +5,15 @@ use embedded_graphics::{
     mono_font::{jis_x0201::FONT_10X20, MonoTextStyle},
     pixelcolor::Rgb565,
     primitives::{Circle, PrimitiveStyle, Rectangle, Styled},
-    text::{Text, TextStyleBuilder},
+    text::{renderer::CharacterStyle, Text, TextStyleBuilder},
     Drawable,
 };
 use tinybmp::Bmp;
 
-use crate::lcd::{LcdController, LCD_HEIGHT, LCD_WIDTH};
+use crate::{
+    graphics::colors::WHITE,
+    lcd::{LcdController, LCD_HEIGHT, LCD_WIDTH},
+};
 
 /// 图形基元绘制器
 ///
@@ -159,7 +162,9 @@ impl<'a> GraphicsPrimitives<'a> {
     /// graphics.draw_text("Hello, ESP32!", 10, 30, white)?;
     /// ```
     pub fn draw_text(&mut self, text: &str, x: i32, y: i32, color: Rgb565) -> Result<()> {
-        let character_style = MonoTextStyle::new(&FONT_10X20, color);
+        let mut character_style = MonoTextStyle::new(&FONT_10X20, color);
+        character_style.set_background_color(Some(WHITE));
+
         let text_style = TextStyleBuilder::new().build();
 
         let text_obj = Text::with_text_style(text, Point::new(x, y), character_style, text_style);

@@ -5,15 +5,12 @@ use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 mod graphics;
 mod lcd;
 mod lcd_cmds;
-use lcd::{LcdController, COLOR_BLACK};
+use lcd::LcdController;
 use tinybmp::Bmp;
 
-use crate::{
-    graphics::{
-        colors::{get_all_colors, BLUE, GREEN, RED, YELLOW},
-        primitives::GraphicsPrimitives,
-    },
-    lcd::COLOR_RED,
+use crate::graphics::{
+    colors::{RED, WHITE},
+    primitives::GraphicsPrimitives,
 };
 
 fn main() -> Result<()> {
@@ -31,32 +28,16 @@ fn main() -> Result<()> {
 
     // lcd.fill_screen(COLOR_BLACK)?;
 
-    // let bmp_data = include_bytes!("../assets/xk.bmp");
+    let bmp_data = include_bytes!("../assets/xk.bmp");
     // Parse the BMP file.
-    // let bmp = Bmp::from_slice(bmp_data).unwrap();
+    let bmp = Bmp::from_slice(bmp_data).unwrap();
 
     let mut primitives = GraphicsPrimitives::new(&mut lcd);
+    primitives.fill_screen(WHITE)?;
+    primitives.draw_image(&bmp, 100, 100)?;
 
     loop {
-        primitives.fill_screen(BLUE)?;
-
-        FreeRtos::delay_ms(1000);
-
-        primitives.fill_screen(RED)?;
-
-        FreeRtos::delay_ms(1000);
-
-        primitives.fill_screen(GREEN)?;
-
-        FreeRtos::delay_ms(1000);
-
-        primitives.fill_screen(YELLOW)?;
-
-        // primitives.draw_image(&bmp, 100, 100)?;
-
-        // for color in get_all_colors() {
-        //     FreeRtos::delay_ms(1000);
-        // }
+        primitives.draw_text("Hello, World!", 100, 100, RED)?;
 
         FreeRtos::delay_ms(3000);
     }

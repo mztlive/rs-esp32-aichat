@@ -20,10 +20,3 @@ pub const LIME: Rgb565 = Rgb565::new(16, 63, 0);
 pub const SILVER: Rgb565 = Rgb565::new(24, 48, 24);
 pub const MAROON: Rgb565 = Rgb565::new(16, 0, 0);
 pub const OLIVE: Rgb565 = Rgb565::new(16, 32, 0);
-
-pub fn get_all_colors() -> Vec<Rgb565> {
-    vec![
-        BLACK, WHITE, RED, GREEN, BLUE, YELLOW, CYAN, MAGENTA, ORANGE, PURPLE, PINK, BROWN, GRAY,
-        DARK_GRAY, LIGHT_GRAY, NAVY, LIME, SILVER, MAROON, OLIVE,
-    ]
-}

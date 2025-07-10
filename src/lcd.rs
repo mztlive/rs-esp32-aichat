@@ -36,16 +36,6 @@ pub const QSPI_PIN_NUM_LCD_TE: i32 = gpio_num_t_GPIO_NUM_18; // LCD_TE (Tearing 
 pub const QSPI_PIN_NUM_LCD_BL: i32 = gpio_num_t_GPIO_NUM_5; // LCD_BL (背光)
 pub const QSPI_PIN_NUM_LCD_RST: i32 = gpio_num_t_GPIO_NUM_NC; // LCD_RST
 
-// 预定义颜色（RGB565）
-pub const COLOR_BLACK: u16 = 0x0000;
-pub const COLOR_WHITE: u16 = 0xFFFF;
-pub const COLOR_RED: u16 = 0xF800;
-pub const COLOR_GREEN: u16 = 0x07E0;
-pub const COLOR_BLUE: u16 = 0x001F;
-pub const COLOR_YELLOW: u16 = 0xFFE0;
-pub const COLOR_CYAN: u16 = 0x07FF;
-pub const COLOR_MAGENTA: u16 = 0xF81F;
-
 // =================================================
 
 pub struct LcdController {
@@ -203,9 +193,6 @@ impl LcdController {
             // 步骤4：先关闭显示，清除GRAM，再开启显示
             esp!(esp_lcd_panel_disp_on_off(self.panel, false))?;
             std::thread::sleep(std::time::Duration::from_millis(50));
-
-            // 清除显示器内容，确保干净的显示
-            self.fill_screen(COLOR_BLACK)?;
 
             esp!(esp_lcd_panel_disp_on_off(self.panel, true))?;
         }
