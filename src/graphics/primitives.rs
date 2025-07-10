@@ -15,7 +15,7 @@ use crate::{
         layout::{GridPosition, ScreenRect},
         ui::traits::UIComponent,
     },
-    lcd::{LcdController, LCD_HEIGHT, LCD_WIDTH},
+    peripherals::st77916::lcd::{LcdController, LCD_HEIGHT, LCD_WIDTH},
 };
 
 /// 图形基元绘制器

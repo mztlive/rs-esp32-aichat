@@ -4,15 +4,16 @@ use embedded_graphics::pixelcolor::Rgb565;
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 
 mod graphics;
-mod lcd;
-mod lcd_cmds;
-use lcd::LcdController;
+mod peripherals;
 use tinybmp::Bmp;
 
-use crate::graphics::{
-    animation::FrameAnimation,
-    colors::{BLUE, WHITE},
-    primitives::GraphicsPrimitives,
+use crate::{
+    graphics::{
+        animation::FrameAnimation,
+        colors::{BLUE, WHITE},
+        primitives::GraphicsPrimitives,
+    },
+    peripherals::st77916::lcd::LcdController,
 };
 
 // 定义donghua动画图片数据数组

@@ -5,7 +5,7 @@ use esp_idf_sys::st77916::{esp_lcd_new_panel_st77916, st77916_vendor_config_t};
 use esp_idf_sys::*;
 use std::ptr;
 
-use crate::lcd_cmds::get_vendor_specific_init_new;
+use super::lcd_cmds::get_vendor_specific_init_new;
 
 // embedded-graphics相关导入
 use embedded_graphics::{
