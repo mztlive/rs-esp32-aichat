@@ -536,15 +536,4 @@ impl<'a> GraphicsPrimitives<'a> {
         let rect = ScreenRect::new(top_left_x, top_left_y, GRID_SIZE, GRID_SIZE);
         self.fill_rect(&rect, color)
     }
-
-    pub fn draw_text_in_rect(
-        &mut self,
-        rect: &ScreenRect,
-        text: &str,
-        color: Rgb565,
-    ) -> Result<()> {
-        let (center_x, center_y) = rect.center();
-
-        self.draw_text(text, center_x, center_y, color)
-    }
 }

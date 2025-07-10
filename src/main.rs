@@ -10,7 +10,7 @@ use tinybmp::Bmp;
 
 use crate::graphics::{
     colors::{BLUE, GREEN, RED, WHITE, YELLOW},
-    layout::{GridPosition, STATUS_BAR, STATUS_BAR_TEXT},
+    layout::{GridPosition, STATUS_BAR},
     primitives::GraphicsPrimitives,
 };
 
@@ -38,7 +38,6 @@ fn main() -> Result<()> {
     // 演示新的快速绘制功能
     primitives.fill_screen(WHITE)?;
     primitives.fill_rect(&STATUS_BAR, RED)?;
-    primitives.draw_text_in_rect(&STATUS_BAR_TEXT, "Hello, World!", RED)?;
 
     loop {
         FreeRtos::delay_ms(1000);
