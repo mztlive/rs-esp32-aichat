@@ -1,5 +1,5 @@
 use super::traits::UIComponent;
-use crate::graphics::layout::{SCREEN_WIDTH, STATUS_BAR, TEXT_CHAR_WIDTH, TEXT_LINE_HEIGHT};
+use crate::graphics::layout::{SCREEN_WIDTH, STATUS_BAR, TEXT_CHAR_WIDTH};
 use crate::graphics::primitives::GraphicsPrimitives;
 use anyhow::Result;
 use embedded_graphics::pixelcolor::Rgb565;

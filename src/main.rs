@@ -6,7 +6,6 @@ mod graphics;
 mod lcd;
 mod lcd_cmds;
 use lcd::LcdController;
-use tinybmp::Bmp;
 
 use crate::graphics::{colors::WHITE, primitives::GraphicsPrimitives};
 

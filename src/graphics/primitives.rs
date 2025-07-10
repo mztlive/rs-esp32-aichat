@@ -12,7 +12,6 @@ use tinybmp::Bmp;
 
 use crate::{
     graphics::{
-        colors::WHITE,
         layout::{GridPosition, ScreenRect},
         ui::traits::UIComponent,
     },

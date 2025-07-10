@@ -1,6 +1,5 @@
 use crate::graphics::primitives::GraphicsPrimitives;
 use anyhow::Result;
-use embedded_graphics::pixelcolor::Rgb565;
 
 /// UI组件通用trait
 ///
