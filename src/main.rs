@@ -9,7 +9,8 @@ use lcd::LcdController;
 use tinybmp::Bmp;
 
 use crate::graphics::{
-    colors::{RED, WHITE},
+    colors::{BLUE, GREEN, RED, WHITE, YELLOW},
+    layout::{GridPosition, STATUS_BAR, STATUS_BAR_TEXT},
     primitives::GraphicsPrimitives,
 };
 
@@ -28,17 +29,18 @@ fn main() -> Result<()> {
 
     // lcd.fill_screen(COLOR_BLACK)?;
 
-    let bmp_data = include_bytes!("../assets/xk.bmp");
-    // Parse the BMP file.
-    let bmp = Bmp::from_slice(bmp_data).unwrap();
+    // let bmp_data = include_bytes!("../assets/xk.bmp");
+    // // Parse the BMP file.
+    // let bmp = Bmp::from_slice(bmp_data).unwrap();
 
     let mut primitives = GraphicsPrimitives::new(&mut lcd);
+
+    // 演示新的快速绘制功能
     primitives.fill_screen(WHITE)?;
-    primitives.draw_image(&bmp, 100, 100)?;
+    primitives.fill_rect(&STATUS_BAR, RED)?;
+    primitives.draw_text_in_rect(&STATUS_BAR_TEXT, "Hello, World!", RED)?;
 
     loop {
-        primitives.draw_text("Hello, World!", 100, 100, RED)?;
-
-        FreeRtos::delay_ms(3000);
+        FreeRtos::delay_ms(1000);
     }
 }
