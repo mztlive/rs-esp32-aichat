@@ -127,3 +127,4 @@ source ~/Development/esp32/esp-idf/export.sh
 - 图像数据使用RGB565格式，注意大端序处理
 - 动画播放时需要适当的延迟以控制帧率
 - 背光控制通过GPIO5管理，默认开启
+- 永远不要主动cargo check 或者 build、 run，把编译的选择权交给用户
