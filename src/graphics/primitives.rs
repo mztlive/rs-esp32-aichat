@@ -3,11 +3,12 @@ use embedded_graphics::{
     geometry::Point,
     mono_font::{jis_x0201::FONT_10X20, MonoTextStyle},
     pixelcolor::Rgb565,
+    primitives::{Circle, PrimitiveStyle, Styled},
     text::{Text, TextStyleBuilder},
     Drawable,
 };
 
-use crate::lcd::{LcdController, LCD_HEIGHT, LCD_WIDTH};
+use crate::lcd::LcdController;
 
 pub struct GraphicsPrimitives<'a> {
     lcd: &'a mut LcdController,
@@ -18,78 +19,26 @@ impl<'a> GraphicsPrimitives<'a> {
         Self { lcd }
     }
 
-    /// 绘制单个像素
-    pub fn draw_pixel(&self, x: i32, y: i32, color: u16) -> Result<()> {
-        self.lcd.draw_pixel(x, y, color)
-    }
-
-    /// 绘制圆形（使用Bresenham算法）
-    pub fn draw_circle(&self, center_x: i32, center_y: i32, radius: i32, color: u16) -> Result<()> {
-        if radius <= 0 {
-            return Ok(());
-        }
-
-        let mut x = 0;
-        let mut y = radius;
-        let mut decision = 1 - radius;
-
-        // 绘制中心点
-        self.draw_pixel(center_x, center_y, color)?;
-
-        while x <= y {
-            // 绘制八个对称点
-            self.draw_pixel(center_x + x, center_y + y, color)?;
-            self.draw_pixel(center_x - x, center_y + y, color)?;
-            self.draw_pixel(center_x + x, center_y - y, color)?;
-            self.draw_pixel(center_x - x, center_y - y, color)?;
-            self.draw_pixel(center_x + y, center_y + x, color)?;
-            self.draw_pixel(center_x - y, center_y + x, color)?;
-            self.draw_pixel(center_x + y, center_y - x, color)?;
-            self.draw_pixel(center_x - y, center_y - x, color)?;
-
-            x += 1;
-            if decision < 0 {
-                decision += 2 * x + 1;
-            } else {
-                y -= 1;
-                decision += 2 * (x - y) + 1;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// 绘制实心圆形（填充）
+    /// 绘制实心圆形（填充）- 使用embedded-graphics实现
     pub fn draw_filled_circle(
-        &self,
+        &mut self,
         center_x: i32,
         center_y: i32,
         radius: i32,
-        color: u16,
+        color: Rgb565,
     ) -> Result<()> {
         if radius <= 0 {
             return Ok(());
         }
 
-        for y in -radius..=radius {
-            let y_coord = center_y + y;
-            if !(0..LCD_HEIGHT).contains(&y_coord) {
-                continue;
-            }
+        let circle = Circle::new(
+            Point::new(center_x - radius, center_y - radius),
+            (radius * 2) as u32,
+        );
 
-            // 计算当前行的半宽
-            let half_width = ((radius * radius - y * y) as f32).sqrt() as i32;
-
-            let x_start = (center_x - half_width).max(0);
-            let x_end = (center_x + half_width + 1).min(LCD_WIDTH);
-
-            if x_start < x_end {
-                let line_width = (x_end - x_start) as usize;
-                let line_buffer = vec![color; line_width];
-                self.lcd
-                    .draw_bitmap(x_start, y_coord, x_end, y_coord + 1, &line_buffer)?;
-            }
-        }
+        let style = PrimitiveStyle::with_fill(color);
+        let styled_circle = Styled::new(circle, style);
+        styled_circle.draw(self.lcd)?;
 
         Ok(())
     }

@@ -1,18 +1,19 @@
-use anyhow::Result;
 use crate::graphics::primitives::GraphicsPrimitives;
+use crate::graphics::rgb565_from_u16;
 use crate::lcd::{COLOR_BLACK, COLOR_BLUE, COLOR_WHITE, LCD_HEIGHT, LCD_WIDTH};
+use anyhow::Result;
 
 pub struct Eye<'a> {
-    primitives: &'a GraphicsPrimitives<'a>,
+    primitives: &'a mut GraphicsPrimitives<'a>,
 }
 
 impl<'a> Eye<'a> {
-    pub fn new(primitives: &'a GraphicsPrimitives<'a>) -> Self {
+    pub fn new(primitives: &'a mut GraphicsPrimitives<'a>) -> Self {
         Self { primitives }
     }
 
     /// 绘制一个眼睛
-    pub fn draw_eye(&self, center_x: i32, center_y: i32, eye_size: i32) -> Result<()> {
+    pub fn draw_eye(&mut self, center_x: i32, center_y: i32, eye_size: i32) -> Result<()> {
         // 眼球半径
         let eyeball_radius = eye_size;
         // 瞳孔半径
@@ -20,25 +21,68 @@ impl<'a> Eye<'a> {
         // 高光半径
         let highlight_radius = eye_size / 4;
 
-        // 绘制眼球（蓝色）
-        self.primitives.draw_filled_circle(center_x, center_y, eyeball_radius, COLOR_BLUE)?;
-
-        // 绘制瞳孔（黑色，稍微偏右下）
+        // 计算瞳孔和高光位置
         let pupil_x = center_x + eye_size / 6;
         let pupil_y = center_y + eye_size / 6;
-        self.primitives.draw_filled_circle(pupil_x, pupil_y, pupil_radius, COLOR_BLACK)?;
-
-        // 绘制高光（白色，在瞳孔左上角）
         let highlight_x = pupil_x - pupil_radius / 3;
         let highlight_y = pupil_y - pupil_radius / 3;
-        self.primitives.draw_filled_circle(highlight_x, highlight_y, highlight_radius, COLOR_WHITE)?;
+
+        // 创建缓冲区
+        let diameter = (eyeball_radius * 2) as usize;
+        let buffer_size = diameter * diameter;
+        let mut buffer = vec![COLOR_BLUE; buffer_size];
+
+        // 在缓冲区中绘制眼睛
+        for y in 0..diameter {
+            for x in 0..diameter {
+                let pixel_x = x as i32 - eyeball_radius;
+                let pixel_y = y as i32 - eyeball_radius;
+                let world_x = center_x + pixel_x;
+                let world_y = center_y + pixel_y;
+
+                // 检查是否在眼球范围内
+                if pixel_x * pixel_x + pixel_y * pixel_y <= eyeball_radius * eyeball_radius {
+                    let mut color = COLOR_BLUE;
+
+                    // 检查是否在瞳孔范围内
+                    let pupil_dx = world_x - pupil_x;
+                    let pupil_dy = world_y - pupil_y;
+                    if pupil_dx * pupil_dx + pupil_dy * pupil_dy <= pupil_radius * pupil_radius {
+                        color = COLOR_BLACK;
+
+                        // 检查是否在高光范围内
+                        let highlight_dx = world_x - highlight_x;
+                        let highlight_dy = world_y - highlight_y;
+                        if highlight_dx * highlight_dx + highlight_dy * highlight_dy
+                            <= highlight_radius * highlight_radius
+                        {
+                            color = COLOR_WHITE;
+                        }
+                    }
+
+                    buffer[y * diameter + x] = color;
+                } else {
+                    // 眼球外部设为透明（这里使用黑色作为背景）
+                    buffer[y * diameter + x] = COLOR_BLACK;
+                }
+            }
+        }
+
+        // 一次性绘制整个眼睛
+        self.primitives.draw_bitmap(
+            center_x - eyeball_radius,
+            center_y - eyeball_radius,
+            center_x + eyeball_radius,
+            center_y + eyeball_radius,
+            &buffer,
+        )?;
 
         Ok(())
     }
 
     /// 绘制一个眼睛，支持瞳孔位置偏移
     pub fn draw_eye_with_pupil_offset(
-        &self,
+        &mut self,
         center_x: i32,
         center_y: i32,
         eye_size: i32,
@@ -52,25 +96,68 @@ impl<'a> Eye<'a> {
         // 高光半径
         let highlight_radius = eye_size / 4;
 
-        // 绘制眼球（蓝色）
-        self.primitives.draw_filled_circle(center_x, center_y, eyeball_radius, COLOR_BLUE)?;
-
-        // 绘制瞳孔（黑色，可以偏移）
+        // 计算瞳孔和高光位置
         let pupil_x = center_x + pupil_offset_x;
         let pupil_y = center_y + pupil_offset_y;
-        self.primitives.draw_filled_circle(pupil_x, pupil_y, pupil_radius, COLOR_BLACK)?;
-
-        // 绘制高光（白色，在瞳孔左上角）
         let highlight_x = pupil_x - pupil_radius / 3;
         let highlight_y = pupil_y - pupil_radius / 3;
-        self.primitives.draw_filled_circle(highlight_x, highlight_y, highlight_radius, COLOR_WHITE)?;
+
+        // 创建缓冲区
+        let diameter = (eyeball_radius * 2) as usize;
+        let buffer_size = diameter * diameter;
+        let mut buffer = vec![COLOR_BLUE; buffer_size];
+
+        // 在缓冲区中绘制眼睛
+        for y in 0..diameter {
+            for x in 0..diameter {
+                let pixel_x = x as i32 - eyeball_radius;
+                let pixel_y = y as i32 - eyeball_radius;
+                let world_x = center_x + pixel_x;
+                let world_y = center_y + pixel_y;
+
+                // 检查是否在眼球范围内
+                if pixel_x * pixel_x + pixel_y * pixel_y <= eyeball_radius * eyeball_radius {
+                    let mut color = COLOR_BLUE;
+
+                    // 检查是否在瞳孔范围内
+                    let pupil_dx = world_x - pupil_x;
+                    let pupil_dy = world_y - pupil_y;
+                    if pupil_dx * pupil_dx + pupil_dy * pupil_dy <= pupil_radius * pupil_radius {
+                        color = COLOR_BLACK;
+
+                        // 检查是否在高光范围内
+                        let highlight_dx = world_x - highlight_x;
+                        let highlight_dy = world_y - highlight_y;
+                        if highlight_dx * highlight_dx + highlight_dy * highlight_dy
+                            <= highlight_radius * highlight_radius
+                        {
+                            color = COLOR_WHITE;
+                        }
+                    }
+
+                    buffer[y * diameter + x] = color;
+                } else {
+                    // 眼球外部设为透明（这里使用黑色作为背景）
+                    buffer[y * diameter + x] = COLOR_BLACK;
+                }
+            }
+        }
+
+        // 一次性绘制整个眼睛
+        self.primitives.draw_bitmap(
+            center_x - eyeball_radius,
+            center_y - eyeball_radius,
+            center_x + eyeball_radius,
+            center_y + eyeball_radius,
+            &buffer,
+        )?;
 
         Ok(())
     }
 
     /// 绘制椭圆形眼睛（用于眨眼效果）
     pub fn draw_eye_blink(
-        &self,
+        &mut self,
         center_x: i32,
         center_y: i32,
         eye_size: i32,
@@ -113,7 +200,8 @@ impl<'a> Eye<'a> {
             if x_start < x_end {
                 let line_width = (x_end - x_start) as usize;
                 let line_buffer = vec![COLOR_BLUE; line_width];
-                self.primitives.draw_bitmap(x_start, y_coord, x_end, y_coord + 1, &line_buffer)?;
+                self.primitives
+                    .draw_bitmap(x_start, y_coord, x_end, y_coord + 1, &line_buffer)?;
             }
         }
 
@@ -124,7 +212,12 @@ impl<'a> Eye<'a> {
             let compressed_pupil_radius = (pupil_radius as f32 * blink_ratio) as i32;
 
             if compressed_pupil_radius > 0 {
-                self.primitives.draw_filled_circle(pupil_x, pupil_y, compressed_pupil_radius, COLOR_BLACK)?;
+                self.primitives.draw_filled_circle(
+                    pupil_x,
+                    pupil_y,
+                    compressed_pupil_radius,
+                    rgb565_from_u16(COLOR_BLACK),
+                )?;
 
                 let highlight_x = pupil_x - compressed_pupil_radius / 3;
                 let highlight_y = pupil_y - compressed_pupil_radius / 3;
@@ -135,7 +228,7 @@ impl<'a> Eye<'a> {
                         highlight_x,
                         highlight_y,
                         compressed_highlight_radius,
-                        COLOR_WHITE,
+                        rgb565_from_u16(COLOR_WHITE),
                     )?;
                 }
             }

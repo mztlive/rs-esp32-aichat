@@ -5,11 +5,14 @@ use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 mod graphics;
 mod lcd;
 mod lcd_cmds;
-mod lcd_graphics;
 mod ui;
 use embedded_graphics::pixelcolor::Rgb565;
 use lcd::{LcdController, COLOR_BLACK, COLOR_RED, COLOR_WHITE};
-use lcd_graphics::LcdGraphics;
+
+use crate::{
+    graphics::primitives::GraphicsPrimitives,
+    ui::{eye::Eye, eye_animation::EyeAnimator},
+};
 
 fn main() -> Result<()> {
     // 必须先调用，打补丁
@@ -41,15 +44,16 @@ fn main() -> Result<()> {
     // 播放眼睛动画
     println!("开始播放眼睛动画...");
 
-    loop {
-        // 创建绘图对象
-        let mut graphics = LcdGraphics::new(&mut lcd);
+    let mut primitives = GraphicsPrimitives::new(&mut lcd);
+    let mut eye = Eye::new(&mut primitives);
+    let mut graphics = EyeAnimator::new(&mut eye);
 
+    loop {
         // 播放一轮完整的眼睛动画
         graphics.play_eye_animation()?;
 
         // 显示文本
-        graphics.draw_text("Phoenix.H!", 140, 280, Rgb565::new(31, 63, 31))?;
+        // graphics.draw_text("Phoenix.H!", 140, 280, Rgb565::new(31, 63, 31))?;
 
         // 等待3秒后重新开始动画
         FreeRtos::delay_ms(3000);
