@@ -8,12 +8,7 @@ mod lcd_cmds;
 use lcd::LcdController;
 use tinybmp::Bmp;
 
-use crate::graphics::{
-    colors::{BLACK, BLUE, GREEN, RED, WHITE, YELLOW},
-    layout::{GridPosition, STATUS_BAR},
-    primitives::GraphicsPrimitives,
-    ui::{StatusBar, StatusBarPosition},
-};
+use crate::graphics::{colors::WHITE, primitives::GraphicsPrimitives};
 
 fn main() -> Result<()> {
     // 必须先调用，打补丁
@@ -36,20 +31,7 @@ fn main() -> Result<()> {
 
     let mut primitives = GraphicsPrimitives::new(&mut lcd);
 
-    // 演示StatusBar组件的使用
     primitives.fill_screen(WHITE)?;
-
-    // 创建StatusBar
-    let mut statusbar = StatusBar::new(BLUE);
-    statusbar.add_text("12:34", StatusBarPosition::Left, WHITE, Some(BLUE));
-    statusbar.add_text("ESP32-RS", StatusBarPosition::Center, WHITE, Some(BLUE));
-    statusbar.add_text("100%", StatusBarPosition::Right, WHITE, Some(BLUE));
-
-    // 使用UI组件直接绘制
-    primitives.draw_component(&statusbar)?;
-
-    // 或者使用批量绘制以获得更好的性能
-    // primitives.draw_component_batch(&statusbar)?;
 
     println!("StatusBar已绘制完成！");
 
