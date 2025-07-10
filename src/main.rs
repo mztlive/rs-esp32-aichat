@@ -10,7 +10,7 @@ use embedded_graphics::pixelcolor::Rgb565;
 use lcd::{LcdController, COLOR_BLACK, COLOR_RED, COLOR_WHITE};
 
 use crate::{
-    graphics::primitives::GraphicsPrimitives,
+    graphics::{primitives::GraphicsPrimitives, rgb565_from_u16},
     ui::{eye::Eye, eye_animation::EyeAnimator},
 };
 
@@ -45,15 +45,17 @@ fn main() -> Result<()> {
     println!("开始播放眼睛动画...");
 
     let mut primitives = GraphicsPrimitives::new(&mut lcd);
-    let mut eye = Eye::new(&mut primitives);
-    let mut graphics = EyeAnimator::new(&mut eye);
+    // let mut eye = Eye::new(&mut primitives);
+    // let mut graphics = EyeAnimator::new(&mut eye);
 
     loop {
         // 播放一轮完整的眼睛动画
-        graphics.play_eye_animation()?;
+        // graphics.play_eye_animation()?;
 
         // 显示文本
         // graphics.draw_text("Phoenix.H!", 140, 280, Rgb565::new(31, 63, 31))?;
+
+        primitives.draw_filled_circle(100, 100, 100, rgb565_from_u16(COLOR_RED))?;
 
         // 等待3秒后重新开始动画
         FreeRtos::delay_ms(3000);

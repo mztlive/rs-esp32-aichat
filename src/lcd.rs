@@ -122,7 +122,7 @@ impl LcdController {
             cs_gpio_num: QSPI_PIN_NUM_LCD_CS,
             dc_gpio_num: -1, // QSPI模式不需要DC引脚
             spi_mode: 0,
-            pclk_hz: 40 * 1000 * 1000,
+            pclk_hz: 80_000_000,
             trans_queue_depth: 10,
             on_color_trans_done: None,
             user_ctx: ptr::null_mut(),
@@ -152,11 +152,10 @@ impl LcdController {
         vendor_config.init_cmds = st77916_init_cmds.as_ptr() as *const _;
         vendor_config.init_cmds_size = st77916_init_cmds.len() as u16;
 
-        // 配置面板参数（修复条纹问题）
         let panel_config = esp_lcd_panel_dev_config_t {
             reset_gpio_num: QSPI_PIN_NUM_LCD_RST, // LCD_RST连接到TCA9554扩展IO，暂时不使用
             __bindgen_anon_1: esp_lcd_panel_dev_config_t__bindgen_ty_1 {
-                rgb_ele_order: lcd_rgb_element_order_t_LCD_RGB_ELEMENT_ORDER_RGB,
+                rgb_ele_order: lcd_rgb_element_order_t_LCD_RGB_ELEMENT_ORDER_BGR,
             },
             data_endian: lcd_rgb_data_endian_t_LCD_RGB_DATA_ENDIAN_BIG,
             bits_per_pixel: LCD_BIT_PER_PIXEL as u32,
@@ -294,10 +293,12 @@ impl DrawTarget for LcdController {
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
-        use std::collections::HashMap;
-
-        // 收集按行分组的像素
-        let mut pixels_by_row: HashMap<i32, Vec<(i32, u16)>> = HashMap::new();
+        // 收集所有有效像素并计算边界框
+        let mut min_x = LCD_WIDTH;
+        let mut min_y = LCD_HEIGHT;
+        let mut max_x = -1;
+        let mut max_y = -1;
+        let mut pixel_data = Vec::new();
 
         for Pixel(coord, color) in pixels {
             // 边界检查
@@ -305,48 +306,38 @@ impl DrawTarget for LcdController {
                 continue;
             }
 
+            // 更新边界框
+            min_x = min_x.min(coord.x);
+            min_y = min_y.min(coord.y);
+            max_x = max_x.max(coord.x);
+            max_y = max_y.max(coord.y);
+
             // 将Rgb565转换为RGB565格式的u16值
             let color_u16 =
                 ((color.r() as u16) << 11) | ((color.g() as u16) << 5) | (color.b() as u16);
 
-            // 按行收集像素
-            pixels_by_row
-                .entry(coord.y)
-                .or_default()
-                .push((coord.x, color_u16));
+            pixel_data.push((coord, color_u16));
         }
 
-        // 批量绘制每一行
-        for (row, mut pixels) in pixels_by_row {
-            // 按x坐标排序
-            pixels.sort_by_key(|&(x, _)| x);
-
-            // 查找连续的像素段并批量绘制
-            let mut i = 0;
-            while i < pixels.len() {
-                let start_x = pixels[i].0;
-                let mut end_x = start_x;
-                let mut segment_colors = vec![pixels[i].1];
-
-                // 寻找连续的像素
-                let mut j = i + 1;
-                while j < pixels.len() && pixels[j].0 == end_x + 1 {
-                    end_x = pixels[j].0;
-                    segment_colors.push(pixels[j].1);
-                    j += 1;
-                }
-
-                // 批量绘制连续段
-                if segment_colors.len() > 1 {
-                    self.draw_bitmap(start_x, row, end_x + 1, row + 1, &segment_colors)?;
-                } else {
-                    // 单个像素也用draw_bitmap，避免额外开销
-                    self.draw_bitmap(start_x, row, start_x + 1, row + 1, &segment_colors)?;
-                }
-
-                i = j;
-            }
+        // 如果没有有效像素，直接返回
+        if pixel_data.is_empty() {
+            return Ok(());
         }
+
+        // 创建边界框区域的帧缓冲区
+        let width = (max_x - min_x + 1) as usize;
+        let height = (max_y - min_y + 1) as usize;
+        let mut framebuffer = vec![0u16; width * height];
+
+        // 将像素填入缓冲区
+        for (coord, color_u16) in pixel_data {
+            let x = (coord.x - min_x) as usize;
+            let y = (coord.y - min_y) as usize;
+            framebuffer[y * width + x] = color_u16;
+        }
+
+        // 一次性绘制整个区域
+        self.draw_bitmap(min_x, min_y, max_x + 1, max_y + 1, &framebuffer)?;
 
         Ok(())
     }
