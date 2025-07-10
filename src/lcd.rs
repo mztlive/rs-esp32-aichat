@@ -294,12 +294,60 @@ impl DrawTarget for LcdController {
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
+        use std::collections::HashMap;
+
+        // 收集按行分组的像素
+        let mut pixels_by_row: HashMap<i32, Vec<(i32, u16)>> = HashMap::new();
+
         for Pixel(coord, color) in pixels {
+            // 边界检查
+            if coord.x < 0 || coord.y < 0 || coord.x >= LCD_WIDTH || coord.y >= LCD_HEIGHT {
+                continue;
+            }
+
             // 将Rgb565转换为RGB565格式的u16值
             let color_u16 =
                 ((color.r() as u16) << 11) | ((color.g() as u16) << 5) | (color.b() as u16);
-            self.draw_pixel(coord.x, coord.y, color_u16)?;
+
+            // 按行收集像素
+            pixels_by_row
+                .entry(coord.y)
+                .or_default()
+                .push((coord.x, color_u16));
         }
+
+        // 批量绘制每一行
+        for (row, mut pixels) in pixels_by_row {
+            // 按x坐标排序
+            pixels.sort_by_key(|&(x, _)| x);
+
+            // 查找连续的像素段并批量绘制
+            let mut i = 0;
+            while i < pixels.len() {
+                let start_x = pixels[i].0;
+                let mut end_x = start_x;
+                let mut segment_colors = vec![pixels[i].1];
+
+                // 寻找连续的像素
+                let mut j = i + 1;
+                while j < pixels.len() && pixels[j].0 == end_x + 1 {
+                    end_x = pixels[j].0;
+                    segment_colors.push(pixels[j].1);
+                    j += 1;
+                }
+
+                // 批量绘制连续段
+                if segment_colors.len() > 1 {
+                    self.draw_bitmap(start_x, row, end_x + 1, row + 1, &segment_colors)?;
+                } else {
+                    // 单个像素也用draw_bitmap，避免额外开销
+                    self.draw_bitmap(start_x, row, start_x + 1, row + 1, &segment_colors)?;
+                }
+
+                i = j;
+            }
+        }
+
         Ok(())
     }
 }
