@@ -70,8 +70,6 @@ impl FrameAnimation {
         }
 
         let current_time = unsafe { esp_idf_sys::esp_timer_get_time() };
-        println!("Current time: {}", current_time);
-        println!("Last update time: {}", self.last_update_time);
         let elapsed_us = current_time - self.last_update_time;
 
         if elapsed_us >= self.frame_duration_us {
