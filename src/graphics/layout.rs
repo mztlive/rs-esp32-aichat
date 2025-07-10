@@ -170,19 +170,3 @@ pub const STATUS_BAR: ScreenRect = ScreenRect {
     width: SCREEN_WIDTH,
     height: 30,
 };
-
-/// 底部操作栏区域
-pub const ACTION_BAR: ScreenRect = ScreenRect {
-    x: 0,
-    y: SCREEN_HEIGHT - 30,
-    width: SCREEN_WIDTH,
-    height: 30,
-};
-
-/// 顶部状态栏文字区域
-pub const STATUS_BAR_TEXT: ScreenRect = ScreenRect {
-    x: 10,
-    y: 10,
-    width: 100,
-    height: 20,
-};
