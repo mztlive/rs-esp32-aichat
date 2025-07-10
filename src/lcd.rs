@@ -259,6 +259,7 @@ impl LcdController {
         }
 
         println!("fill_screen: 填充完成");
+
         Ok(())
     }
 

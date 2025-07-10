@@ -1,16 +1,16 @@
 use anyhow::Result;
 use embedded_graphics::{
-    geometry::Point,
+    geometry::{Point, Size},
     image::Image,
     mono_font::{jis_x0201::FONT_10X20, MonoTextStyle},
     pixelcolor::Rgb565,
-    primitives::{Circle, PrimitiveStyle, Styled},
+    primitives::{Circle, PrimitiveStyle, Rectangle, Styled},
     text::{Text, TextStyleBuilder},
     Drawable,
 };
 use tinybmp::Bmp;
 
-use crate::lcd::LcdController;
+use crate::lcd::{LcdController, LCD_HEIGHT, LCD_WIDTH};
 
 /// 图形基元绘制器
 ///
@@ -170,36 +170,38 @@ impl<'a> GraphicsPrimitives<'a> {
     /// 用指定颜色填充整个屏幕
     ///
     /// 将LCD屏幕的所有像素设置为指定的颜色，相当于清空屏幕操作。
+    /// 使用embedded-graphics库绘制一个覆盖整个屏幕的矩形。
     ///
     /// # 参数
     ///
-    /// * `color` - 填充屏幕的颜色值，16位RGB格式（5-6-5位分别对应R-G-B分量）
+    /// * `color` - 填充屏幕的颜色值，Rgb565格式
     ///
     /// # 返回值
     ///
     /// * `Ok(())` - 填充成功
     /// * `Err(anyhow::Error)` - 填充失败，通常是由于LCD通信错误
     ///
-    /// # 颜色格式
-    ///
-    /// 颜色值使用16位RGB格式：
-    /// - 位[15:11]: 红色分量（5位）
-    /// - 位[10:5]:  绿色分量（6位）
-    /// - 位[4:0]:   蓝色分量（5位）
-    ///
     /// # 示例
     ///
     /// ```rust,no_run
+    /// use embedded_graphics::pixelcolor::Rgb565;
+    /// use crate::graphics::colors::*;
+    ///
     /// // 用黑色填充屏幕
-    /// graphics.fill_screen(0x0000)?;
+    /// graphics.fill_screen(BLACK)?;
     ///
     /// // 用白色填充屏幕  
-    /// graphics.fill_screen(0xFFFF)?;
+    /// graphics.fill_screen(WHITE)?;
     ///
     /// // 用红色填充屏幕
-    /// graphics.fill_screen(0xF800)?;
+    /// graphics.fill_screen(RED)?;
     /// ```
-    pub fn fill_screen(&self, color: u16) -> Result<()> {
-        self.lcd.fill_screen(color)
+    pub fn fill_screen(&mut self, color: Rgb565) -> Result<()> {
+        let screen_size = Size::new(LCD_WIDTH as u32, LCD_HEIGHT as u32);
+        let rectangle = Rectangle::new(Point::zero(), screen_size);
+        let style = PrimitiveStyle::with_fill(color);
+        let styled_rectangle = Styled::new(rectangle, style);
+        styled_rectangle.draw(self.lcd)?;
+        Ok(())
     }
 }

@@ -8,7 +8,13 @@ mod lcd_cmds;
 use lcd::{LcdController, COLOR_BLACK};
 use tinybmp::Bmp;
 
-use crate::graphics::primitives::GraphicsPrimitives;
+use crate::{
+    graphics::{
+        colors::{get_all_colors, BLUE, RED},
+        primitives::GraphicsPrimitives,
+    },
+    lcd::COLOR_RED,
+};
 
 fn main() -> Result<()> {
     // 必须先调用，打补丁
@@ -23,16 +29,22 @@ fn main() -> Result<()> {
     println!("正在初始化LCD控制器...");
     let mut lcd = LcdController::new(p)?;
 
-    lcd.fill_screen(COLOR_BLACK)?;
+    // lcd.fill_screen(COLOR_BLACK)?;
 
-    let bmp_data = include_bytes!("../assets/xk.bmp");
+    // let bmp_data = include_bytes!("../assets/xk.bmp");
     // Parse the BMP file.
-    let bmp = Bmp::from_slice(bmp_data).unwrap();
+    // let bmp = Bmp::from_slice(bmp_data).unwrap();
 
     let mut primitives = GraphicsPrimitives::new(&mut lcd);
 
     loop {
-        primitives.draw_image(&bmp, 100, 100)?;
+        primitives.fill_screen(BLUE)?;
+
+        // primitives.draw_image(&bmp, 100, 100)?;
+
+        // for color in get_all_colors() {
+        //     FreeRtos::delay_ms(1000);
+        // }
 
         FreeRtos::delay_ms(3000);
     }
