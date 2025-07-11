@@ -16,6 +16,13 @@ pub enum AppState {
     Main,
     /// 设置界面
     Settings,
+
+    /// 思考中状态可以用于模拟AI处理请求的过程
+    Thinking,
+
+    /// 头晕，当设备被摇晃时
+    Dizziness,
+
     /// 错误界面
     Error(String),
 }
@@ -69,6 +76,8 @@ impl<'a> ChatApp<'a> {
             AppState::Main => self.update_main()?,
             AppState::Settings => self.update_settings()?,
             AppState::Error(msg) => self.update_error(msg.clone())?,
+            AppState::Thinking => todo!(),
+            AppState::Dizziness => todo!(),
         }
 
         Ok(())
@@ -118,23 +127,15 @@ impl<'a> ChatApp<'a> {
 
     /// 更新欢迎界面
     fn update_welcome(&mut self) -> Result<()> {
-        // 绘制欢迎界面
-        self.graphics
-            .draw_text("AI 聊天助手", 180, 100, WHITE, Some(BLACK))?;
-        self.graphics
-            .draw_text("ESP32-S3 版本", 180, 140, GREEN, Some(BLACK))?;
-        self.graphics
-            .draw_text("按任意键开始", 180, 220, BLUE, Some(BLACK))?;
+        // 绘制欢迎界面 - 垂直居中显示
+        let center_y = 180; // 屏幕中心Y坐标
 
-        // 闪烁效果
-        if (self.state_timer / 30) % 2 == 0 {
-            self.graphics.draw_text("●", 180, 280, WHITE, Some(BLACK))?;
-        }
-
-        // 5秒后自动进入主界面（演示用）
-        if self.state_timer > 250 {
-            self.transition_to(AppState::Main)?;
-        }
+        self.graphics
+            .draw_text("AI Chat", 180, center_y - 40, WHITE, Some(BLACK))?;
+        self.graphics
+            .draw_text("ESP32-S3", 180, center_y, GREEN, Some(BLACK))?;
+        self.graphics
+            .draw_text("Click Any Key", 180, center_y + 40, BLUE, Some(BLACK))?;
 
         Ok(())
     }
