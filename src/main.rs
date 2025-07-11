@@ -9,7 +9,7 @@ mod peripherals;
 use crate::{
     app::{ChatApp, UserInput},
     graphics::primitives::GraphicsPrimitives,
-    peripherals::st77916::lcd::LcdController,
+    peripherals::{qmi8658::motion_detector::MotionDetector, st77916::lcd::LcdController},
 };
 
 fn main() -> Result<()> {
@@ -38,6 +38,9 @@ fn main() -> Result<()> {
         peripherals::qmi8658::QMI8658_ADDRESS_HIGH,
     )?;
 
+    // 初始化运动检测器
+    let mut motion_detector = MotionDetector::new();
+
     // 初始化 LCD 控制器
     println!("正在初始化LCD控制器...");
     let mut lcd = LcdController::new(bl_io)?;
@@ -54,7 +57,7 @@ fn main() -> Result<()> {
     let mut loop_counter = 0;
     loop {
         let sensor_data = qmi8658.read_sensor_data()?;
-        let motion_state = qmi8658.detect_motion(&sensor_data);
+        let motion_state = motion_detector.detect_motion(&sensor_data);
 
         // 每10次循环打印一次传感器数据，避免输出过多
         if loop_counter % 10 == 0 {
@@ -63,7 +66,7 @@ fn main() -> Result<()> {
         }
 
         // 检测到晃动时的特殊处理
-        if qmi8658.is_shaking(&sensor_data) {
+        if motion_detector.is_shaking(&sensor_data) {
             println!("检测到晃动！");
         }
 
