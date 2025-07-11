@@ -53,7 +53,19 @@ fn main() -> Result<()> {
     // 主事件循环
     let mut loop_counter = 0;
     loop {
-        println!("qmi8658 传感器数据: {:?}", qmi8658.read_sensor_data()?);
+        let sensor_data = qmi8658.read_sensor_data()?;
+        let motion_state = qmi8658.detect_motion(&sensor_data);
+
+        // 每10次循环打印一次传感器数据，避免输出过多
+        if loop_counter % 10 == 0 {
+            println!("传感器数据: {:?}", sensor_data);
+            println!("运动状态: {:?}", motion_state);
+        }
+
+        // 检测到晃动时的特殊处理
+        if qmi8658.is_shaking(&sensor_data) {
+            println!("检测到晃动！");
+        }
 
         // 更新应用状态
         app.update()?;
