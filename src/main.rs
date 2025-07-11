@@ -9,7 +9,10 @@ mod peripherals;
 use crate::{
     app::{ChatApp, UserInput},
     graphics::primitives::GraphicsPrimitives,
-    peripherals::{qmi8658::motion_detector::MotionDetector, st77916::lcd::LcdController},
+    peripherals::{
+        qmi8658::motion_detector::{MotionDetector, MotionState},
+        st77916::lcd::LcdController,
+    },
 };
 
 fn main() -> Result<()> {
@@ -59,15 +62,22 @@ fn main() -> Result<()> {
         let sensor_data = qmi8658.read_sensor_data()?;
         let motion_state = motion_detector.detect_motion(&sensor_data);
 
-        // 每10次循环打印一次传感器数据，避免输出过多
-        if loop_counter % 10 == 0 {
-            println!("传感器数据: {:?}", sensor_data);
-            println!("运动状态: {:?}", motion_state);
+        println!("mation_state is: {:?}", motion_state);
+
+        // 检测到晃动状态变化时的特殊处理
+        if matches!(motion_state, MotionState::Shaking)
+            && !matches!(app.get_state(), app::AppState::Dizziness)
+        {
+            println!("检测到晃动！进入晃动状态");
+            app.enter_dizziness()?;
         }
 
-        // 检测到晃动时的特殊处理
-        if motion_detector.is_shaking(&sensor_data) {
-            println!("检测到晃动！");
+        // 当从晃动状态恢复到静止状态时，检查是否可以返回主界面
+        if matches!(motion_state, MotionState::Still | MotionState::Tilting)
+            && app.can_exit_dizziness()
+        {
+            println!("已经可以结束晃动");
+            app.handle_input(UserInput::Back)?;
         }
 
         // 更新应用状态

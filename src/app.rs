@@ -20,7 +20,7 @@ pub enum AppState {
     /// 思考中状态可以用于模拟AI处理请求的过程
     Thinking,
 
-    /// 头晕，当设备被摇晃时
+    /// 当设备被摇晃时
     Dizziness,
 
     /// 错误界面
@@ -52,6 +52,8 @@ pub struct ChatApp<'a> {
     state_timer: u32,
     /// 消息列表（为未来扩展准备）
     messages: Vec<String>,
+    /// 晃动状态开始时间
+    dizziness_start_time: u32,
 }
 
 impl<'a> ChatApp<'a> {
@@ -62,6 +64,7 @@ impl<'a> ChatApp<'a> {
             graphics,
             state_timer: 0,
             messages: Vec::new(),
+            dizziness_start_time: 0,
         }
     }
 
@@ -76,8 +79,8 @@ impl<'a> ChatApp<'a> {
             AppState::Main => self.update_main()?,
             AppState::Settings => self.update_settings()?,
             AppState::Error(msg) => self.update_error(msg.clone())?,
-            AppState::Thinking => todo!(),
-            AppState::Dizziness => todo!(),
+            AppState::Thinking => self.update_thinking()?,
+            AppState::Dizziness => self.update_dizziness()?,
         }
 
         Ok(())
@@ -104,6 +107,11 @@ impl<'a> ChatApp<'a> {
             // 错误界面：任意按键回到欢迎界面
             (AppState::Error(_), UserInput::ButtonPress) => {
                 self.transition_to(AppState::Welcome)?;
+            }
+
+            // 晃动状态：返回键回到主界面
+            (AppState::Dizziness, UserInput::Back) => {
+                self.transition_to(AppState::Main)?;
             }
 
             // 其他输入忽略
@@ -223,6 +231,78 @@ impl<'a> ChatApp<'a> {
     /// 模拟错误发生
     pub fn simulate_error(&mut self, error_msg: String) -> Result<()> {
         self.transition_to(AppState::Error(error_msg))?;
+        Ok(())
+    }
+
+    /// 进入晃动状态
+    pub fn enter_dizziness(&mut self) -> Result<()> {
+        // 记录进入晃动状态的全局时间，而不是相对于状态转换的时间
+        self.dizziness_start_time = self.state_timer;
+        println!("进入晃动状态，记录开始时间: {}", self.dizziness_start_time);
+        self.transition_to(AppState::Dizziness)?;
+        // 重新设置开始时间，因为transition_to会重置state_timer
+        self.dizziness_start_time = 0;
+        Ok(())
+    }
+
+    /// 检查是否可以退出晃动状态
+    pub fn can_exit_dizziness(&self) -> bool {
+        if self.state != AppState::Dizziness {
+            return false;
+        }
+
+        // 晃动状态至少持续3秒（20fps * 60 = 1200帧 = 1分钟，所以60帧 = 3秒）
+        const MIN_DIZZINESS_DURATION: u32 = 60;
+        // 由于transition_to会重置state_timer，我们直接使用state_timer作为持续时间
+        let can_exit = self.state_timer >= MIN_DIZZINESS_DURATION;
+
+        can_exit
+    }
+
+    /// 更新思考状态
+    fn update_thinking(&mut self) -> Result<()> {
+        // 绘制思考界面
+        self.graphics
+            .draw_text("思考中...", 180, 150, WHITE, Some(BLACK))?;
+
+        // 绘制简单的加载动画
+        let dots = match (self.state_timer / 10) % 4 {
+            0 => "   ",
+            1 => ".  ",
+            2 => ".. ",
+            3 => "...",
+            _ => "   ",
+        };
+        self.graphics
+            .draw_text(dots, 180, 200, GREEN, Some(BLACK))?;
+
+        Ok(())
+    }
+
+    /// 更新晃动状态
+    fn update_dizziness(&mut self) -> Result<()> {
+        // Draw dizziness screen
+        self.graphics
+            .draw_text("Ah! So dizzy!", 180, 120, RED, Some(BLACK))?;
+
+        // Draw shaking effect text
+        let shake_text = match (self.state_timer / 5) % 3 {
+            0 => "Shaking...",
+            1 => "Spinning...",
+            2 => "Feeling dizzy...",
+            _ => "Shaking...",
+        };
+        self.graphics
+            .draw_text(shake_text, 180, 160, WHITE, Some(BLACK))?;
+
+        // Draw prompt message
+        self.graphics
+            .draw_text("Please stop shaking", 180, 200, BLUE, Some(BLACK))?;
+
+        // Draw return hint
+        self.graphics
+            .draw_text("Will return when stable", 180, 240, GREEN, Some(BLACK))?;
+
         Ok(())
     }
 }
