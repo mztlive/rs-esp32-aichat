@@ -1,5 +1,5 @@
 use anyhow::Result;
-use esp_idf_hal::gpio::PinDriver;
+use esp_idf_hal::gpio::{Gpio5, PinDriver};
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_sys::st77916::{esp_lcd_new_panel_st77916, st77916_vendor_config_t};
 use esp_idf_sys::*;
@@ -43,7 +43,7 @@ pub struct LcdController {
 
 impl LcdController {
     /// 创建新的LCD控制器实例
-    pub fn new(peripherals: Peripherals) -> Result<Self> {
+    pub fn new(bl_io: Gpio5) -> Result<Self> {
         // 步骤1：初始化SPI总线
         let io_handle = Self::init_spi_bus()?;
 
@@ -51,7 +51,7 @@ impl LcdController {
         let panel = Self::create_panel(io_handle)?;
 
         // 步骤3：初始化背光控制
-        let backlight = Self::init_backlight(peripherals)?;
+        let backlight = Self::init_backlight(bl_io)?;
 
         // 步骤4：启动显示器
         let controller = LcdController {
@@ -165,9 +165,9 @@ impl LcdController {
 
     /// 初始化背光控制
     fn init_backlight(
-        peripherals: Peripherals,
+        bl_io: Gpio5,
     ) -> Result<PinDriver<'static, esp_idf_hal::gpio::Gpio5, esp_idf_hal::gpio::Output>> {
-        let mut backlight = PinDriver::output(peripherals.pins.gpio5)?;
+        let mut backlight = PinDriver::output(bl_io)?;
         backlight.set_high()?; // 默认开启背光
         Ok(backlight)
     }

@@ -1,6 +1,6 @@
 // src/main.rs
 use anyhow::Result;
-use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
+use esp_idf_hal::{delay::FreeRtos, i2c::I2cConfig, peripherals::Peripherals, prelude::*};
 
 mod app;
 mod graphics;
@@ -21,9 +21,26 @@ fn main() -> Result<()> {
     // 取得外设
     let p = Peripherals::take().unwrap();
 
+    // 传感器gpio
+    let sda = p.pins.gpio11;
+    let scl = p.pins.gpio10;
+    let i2c = p.i2c0;
+
+    // lcd背光控制gpio
+    let bl_io = p.pins.gpio5;
+
+    // 初始化 QMI8658 传感器
+    println!("正在初始化QMI8658传感器...");
+    let mut qmi8658 = peripherals::qmi8658::QMI8658::new(
+        i2c,
+        sda,
+        scl,
+        peripherals::qmi8658::QMI8658_ADDRESS_HIGH,
+    )?;
+
     // 初始化 LCD 控制器
     println!("正在初始化LCD控制器...");
-    let mut lcd = LcdController::new(p)?;
+    let mut lcd = LcdController::new(bl_io)?;
 
     // 创建图形绘制接口
     let graphics = GraphicsPrimitives::new(&mut lcd);
@@ -36,6 +53,8 @@ fn main() -> Result<()> {
     // 主事件循环
     let mut loop_counter = 0;
     loop {
+        println!("qmi8658 传感器数据: {:?}", qmi8658.read_sensor_data()?);
+
         // 更新应用状态
         app.update()?;
 
