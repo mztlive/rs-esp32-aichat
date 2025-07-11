@@ -22,8 +22,8 @@ pub struct MotionDetector {
 impl MotionDetector {
     pub fn new() -> Self {
         Self {
-            accel_threshold: 300.0,    // 加速度变化阈值 300mg (提高阈值)
-            gyro_threshold: 50.0,      // 陀螺仪阈值 50°/s (提高阈值)
+            accel_threshold: 800.0,    // 加速度变化阈值 800mg (大幅摇动)
+            gyro_threshold: 120.0,     // 陀螺仪阈值 120°/s (大幅摇动)
             gravity_nominal: 1000.0,   // 标准重力 1000mg
             tilt_threshold: 45.0,      // 倾斜角度阈值 45°
             prev_accel_magnitude: 0.0,
@@ -46,7 +46,8 @@ impl MotionDetector {
             0.0
         };
         
-        let is_shaking = accel_change > self.accel_threshold || gyro_magnitude > self.gyro_threshold;
+        // 只有加速度变化和陀螺仪值都高时才认为是晃动，避免单纯翻转被误判
+        let is_shaking = accel_change > self.accel_threshold && gyro_magnitude > self.gyro_threshold;
         
         // 检测倾斜：重力矢量偏离垂直方向
         let tilt_angle = Self::calculate_tilt_angle(data.accel_x, data.accel_y, data.accel_z);
@@ -58,7 +59,7 @@ impl MotionDetector {
         if is_shaking {
             self.shake_count += 1;
             self.stable_count = 0;
-            if self.shake_count >= 5 {  // 连续5次检测到晃动 (提高要求)
+            if self.shake_count >= 12 {  // 连续12次检测到晃动 (大幅重复摇动)
                 return MotionState::Shaking;
             }
         } else {
