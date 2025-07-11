@@ -1,42 +1,22 @@
 // src/main.rs
 use anyhow::Result;
-use embedded_graphics::pixelcolor::Rgb565;
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 
+mod app;
 mod graphics;
 mod peripherals;
-use tinybmp::Bmp;
 
 use crate::{
-    graphics::{
-        animation::FrameAnimation,
-        colors::{BLUE, WHITE},
-        primitives::GraphicsPrimitives,
-    },
+    app::{ChatApp, UserInput},
+    graphics::primitives::GraphicsPrimitives,
     peripherals::st77916::lcd::LcdController,
 };
-
-// 定义donghua动画图片数据数组
-const DONGHUA_IMAGES: [&[u8]; 12] = [
-    include_bytes!("../assets/donghua/1.bmp"),
-    include_bytes!("../assets/donghua/2.bmp"),
-    include_bytes!("../assets/donghua/3.bmp"),
-    include_bytes!("../assets/donghua/4.bmp"),
-    include_bytes!("../assets/donghua/5.bmp"),
-    include_bytes!("../assets/donghua/6.bmp"),
-    include_bytes!("../assets/donghua/7.bmp"),
-    include_bytes!("../assets/donghua/8.bmp"),
-    include_bytes!("../assets/donghua/9.bmp"),
-    include_bytes!("../assets/donghua/10.bmp"),
-    include_bytes!("../assets/donghua/11.bmp"),
-    include_bytes!("../assets/donghua/12.bmp"),
-];
 
 fn main() -> Result<()> {
     // 必须先调用，打补丁
     esp_idf_sys::link_patches();
 
-    println!("=== ESP32 LCD 诊断测试程序 ===");
+    println!("=== ESP32 AI 聊天助手 ===");
 
     // 取得外设
     let p = Peripherals::take().unwrap();
@@ -45,44 +25,38 @@ fn main() -> Result<()> {
     println!("正在初始化LCD控制器...");
     let mut lcd = LcdController::new(p)?;
 
-    // lcd.fill_screen(COLOR_BLACK)?;
+    // 创建图形绘制接口
+    let graphics = GraphicsPrimitives::new(&mut lcd);
 
-    // let bmp_data = include_bytes!("../assets/xk.bmp");
-    // // Parse the BMP file.
-    // let bmp = Bmp::from_slice(bmp_data).unwrap();
+    // 创建应用实例
+    let mut app = ChatApp::new(graphics);
 
-    let mut primitives = GraphicsPrimitives::new(&mut lcd);
+    println!("应用启动成功，进入主循环...");
 
-    primitives.fill_screen(WHITE)?;
-    draw_debug_grid!(primitives, BLUE);
-
-    // println!("StatusBar已绘制完成！");
-
-    // 创建动画系统，设置帧率为12.5fps (80ms每帧)
-    let mut animation = FrameAnimation::with_fps(12);
-
-    // 添加所有动画帧
-    for &frame_data in &DONGHUA_IMAGES {
-        animation.add_frame(frame_data);
-    }
-
-    // 主循环
+    // 主事件循环
+    let mut loop_counter = 0;
     loop {
-        // 更新动画状态，使用硬件定时器自动计算时间差
-        if animation.update() {
-            // 帧发生变化，获取当前帧数据并绘制
-            if let Some(frame_data) = animation.get_current_frame() {
-                // 解析 BMP 文件
-                let bmp = Bmp::<Rgb565>::from_slice(frame_data).unwrap();
+        // 更新应用状态
+        app.update()?;
 
-                // 绘制当前帧
-                primitives
-                    .draw_image_at_grid(graphics::layout::GridPosition::MiddleCenter, &bmp)
-                    .unwrap();
-            }
+        // 模拟用户输入处理（实际项目中这里会读取按键/触摸输入）
+        if let Some(input) = simulate_user_input(loop_counter) {
+            app.handle_input(input)?;
         }
 
-        // 使用较短的延迟，让动画更平滑
-        FreeRtos::delay_ms(1);
+        // 控制更新频率 (约20fps)
+        FreeRtos::delay_ms(50);
+        loop_counter += 1;
+    }
+}
+
+/// 模拟用户输入（实际项目中替换为真实的输入处理）
+fn simulate_user_input(loop_counter: u32) -> Option<UserInput> {
+    match loop_counter {
+        // 模拟一些用户操作来演示状态转换
+        300 => Some(UserInput::ButtonPress), // 10秒后模拟按键
+        600 => Some(UserInput::Settings),    // 20秒后进入设置
+        900 => Some(UserInput::Back),        // 30秒后返回主界面
+        _ => None,
     }
 }
