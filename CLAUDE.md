@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目简介
 
-这是一个基于ESP32-S3的Rust项目，用于控制360x360像素的LCD显示屏（ST77916驱动）。项目实现了完整的图形绘制系统，支持图像显示、动画播放、文本渲染等功能。
+这是一个基于ESP32-S3的Rust项目，用于控制360x360像素的LCD显示屏（ST77916驱动）。项目实现了完整的图形绘制系统和AI聊天助手应用，支持图像显示、动画播放、文本渲染、运动传感器检测等功能。
 
 ## 常用命令
 
@@ -36,15 +36,22 @@ source ~/Development/esp32/esp-idf/export.sh
 ## 代码架构
 
 ### 模块结构
-- `main.rs` - 主程序入口，实现动画循环显示
-- `lcd.rs` - LCD控制器，负责硬件初始化和底层绘制
-- `lcd_cmds.rs` - LCD命令定义和初始化序列
+- `main.rs` - 主程序入口，实现传感器数据采集和应用主循环
+- `app.rs` - 应用状态机，管理AI聊天助手的不同界面状态
+- `peripherals/` - 外设驱动模块
+  - `st77916/` - ST77916 LCD驱动
+    - `lcd.rs` - LCD控制器，负责硬件初始化和底层绘制
+    - `lcd_cmds.rs` - LCD命令定义和初始化序列
+  - `qmi8658/` - QMI8658运动传感器驱动
+    - `driver.rs` - 传感器底层驱动
+    - `motion_detector.rs` - 运动检测逻辑
 - `graphics/` - 图形绘制模块
   - `mod.rs` - 模块导出
   - `layout.rs` - 屏幕布局和坐标定义（九宫格、中心点等）
   - `primitives.rs` - 基本图形绘制原语
   - `colors.rs` - 颜色常量定义
   - `helper.rs` - 辅助函数（颜色转换、几何计算等）
+  - `animation.rs` - 动画播放功能
   - `ui/` - UI组件
     - `statusbar.rs` - 状态栏组件
     - `traits.rs` - UI组件接口定义
@@ -52,12 +59,15 @@ source ~/Development/esp32/esp-idf/export.sh
 ### 硬件配置
 - **目标芯片**: ESP32-S3
 - **显示屏**: 360x360像素，ST77916驱动，QSPI接口
+- **运动传感器**: QMI8658 六轴传感器，I2C接口
 - **引脚映射**: 
   - LCD_SCK: GPIO40
   - LCD_CS: GPIO21  
   - LCD_SDA0-3: GPIO46/45/42/41
   - LCD_TE: GPIO18
   - LCD_BL: GPIO5
+  - I2C_SDA: GPIO11
+  - I2C_SCL: GPIO10
 
 ### 图形系统设计
 
@@ -99,9 +109,10 @@ source ~/Development/esp32/esp-idf/export.sh
 3. 在`graphics/colors.rs`中添加新颜色常量（如需要）
 
 ### 修改显示内容
-1. 主要逻辑在`main.rs`中修改
-2. 动画图像放在`assets/`目录下
-3. 使用`GraphicsPrimitives`提供的方法进行绘制
+1. 应用状态管理在`app.rs`中修改
+2. 主循环和传感器逻辑在`main.rs`中修改
+3. 动画图像放在`assets/`目录下
+4. 使用`GraphicsPrimitives`提供的方法进行绘制
 
 ### 调试显示问题
 1. 检查硬件连接和引脚配置
@@ -120,6 +131,22 @@ source ~/Development/esp32/esp-idf/export.sh
 - `embuild` - ESP构建工具
 - Rust工具链: `esp` channel (见`rust-toolchain.toml`)
 
+### 添加新的传感器功能
+1. 在`peripherals/qmi8658/motion_detector.rs`中添加新的运动检测算法
+2. 在`app.rs`中添加新的应用状态来响应传感器事件
+3. 在主循环中集成新的传感器数据处理逻辑
+
+### 应用状态管理
+应用使用状态机模式管理不同界面：
+- `AppState::Welcome` - 欢迎界面
+- `AppState::Main` - 主聊天界面
+- `AppState::Settings` - 设置界面
+- `AppState::Thinking` - AI思考状态
+- `AppState::Dizziness` - 设备被摇晃状态
+- `AppState::Error` - 错误状态
+
+状态转换通过`UserInput`枚举触发，支持按键、确认、取消等操作。
+
 ## 注意事项
 
 - 项目使用ESP-IDF框架，需要正确配置ESP-IDF环境
@@ -127,4 +154,6 @@ source ~/Development/esp32/esp-idf/export.sh
 - 图像数据使用RGB565格式，注意大端序处理
 - 动画播放时需要适当的延迟以控制帧率
 - 背光控制通过GPIO5管理，默认开启
+- QMI8658传感器使用I2C接口，支持运动检测和摇晃检测
+- 应用状态机运行在主循环中，约20fps更新频率
 - 永远不要主动cargo check 或者 build、 run，把编译的选择权交给用户
