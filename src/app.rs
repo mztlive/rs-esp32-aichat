@@ -1,9 +1,9 @@
 use anyhow::Result;
 
 use crate::graphics::{
-    colors::{BLACK, BLUE, GREEN, RED, WHITE, YELLOW},
-    layout::ScreenRect,
+    colors::BLACK,
     primitives::GraphicsPrimitives,
+    screens::{dizziness, error, home, settings, thinking, tilting, welcome},
 };
 
 /// 应用状态枚举
@@ -74,13 +74,19 @@ impl<'a> ChatApp<'a> {
 
         // 根据当前状态执行相应逻辑
         match &self.state {
-            AppState::Welcome => self.update_welcome()?,
-            AppState::Main => self.update_main()?,
-            AppState::Settings => self.update_settings()?,
-            AppState::Error(msg) => self.update_error(msg.clone())?,
-            AppState::Thinking => self.update_thinking()?,
-            AppState::Dizziness => self.update_dizziness()?,
-            AppState::Tilting => self.update_tilting()?,
+            AppState::Welcome => welcome::draw(&mut self.graphics)?,
+            AppState::Main => home::draw(&mut self.graphics)?,
+            AppState::Settings => settings::draw(&mut self.graphics)?,
+            AppState::Error(msg) => {
+                error::draw(&mut self.graphics, msg)?;
+                // 3秒后自动返回欢迎界面
+                if self.state_timer > 150 {
+                    self.enter_welcome()?;
+                }
+            }
+            AppState::Thinking => thinking::draw(&mut self.graphics, self.state_timer)?,
+            AppState::Dizziness => dizziness::draw(&mut self.graphics, self.state_timer)?,
+            AppState::Tilting => tilting::draw(&mut self.graphics)?,
         }
 
         Ok(())
@@ -128,87 +134,6 @@ impl<'a> ChatApp<'a> {
 
         // 清屏准备绘制新状态
         self.graphics.fill_screen(BLACK)?;
-
-        Ok(())
-    }
-
-    /// 更新欢迎界面
-    fn update_welcome(&mut self) -> Result<()> {
-        // 绘制欢迎界面 - 垂直居中显示
-        let center_y = 180; // 屏幕中心Y坐标
-
-        self.graphics
-            .draw_text("AI Chat", 180, center_y - 40, WHITE, Some(BLACK))?;
-        self.graphics
-            .draw_text("ESP32-S3", 180, center_y, GREEN, Some(BLACK))?;
-        self.graphics
-            .draw_text("Click Any Key", 180, center_y + 40, BLUE, Some(BLACK))?;
-
-        Ok(())
-    }
-
-    /// 更新主界面
-    fn update_main(&mut self) -> Result<()> {
-        // 绘制主界面
-        self.graphics
-            .draw_text("聊天界面", 180, 50, WHITE, Some(BLACK))?;
-
-        // 绘制消息列表区域边框
-        let message_area = ScreenRect::new(20, 80, 320, 200);
-        self.graphics.draw_rect_border(&message_area, WHITE, 2)?;
-        self.graphics
-            .draw_text("消息区域", 180, 120, WHITE, Some(BLACK))?;
-
-        // 绘制输入区域边框
-        let input_area = ScreenRect::new(20, 290, 320, 40);
-        self.graphics.draw_rect_border(&input_area, BLUE, 2)?;
-        self.graphics
-            .draw_text("输入区域", 180, 310, WHITE, Some(BLACK))?;
-
-        // 绘制操作提示
-        self.graphics
-            .draw_text("按 S 键进入设置", 180, 340, GREEN, Some(BLACK))?;
-
-        Ok(())
-    }
-
-    /// 更新设置界面
-    fn update_settings(&mut self) -> Result<()> {
-        // 绘制设置界面
-        self.graphics
-            .draw_text("设置", 180, 50, WHITE, Some(BLACK))?;
-
-        // 设置选项
-        self.graphics
-            .draw_text("● 主题设置", 80, 120, WHITE, Some(BLACK))?;
-        self.graphics
-            .draw_text("● 网络设置", 80, 160, WHITE, Some(BLACK))?;
-        self.graphics
-            .draw_text("● 语言设置", 80, 200, WHITE, Some(BLACK))?;
-        self.graphics
-            .draw_text("● 关于", 80, 240, WHITE, Some(BLACK))?;
-
-        // 操作提示
-        self.graphics
-            .draw_text("按 B 键返回", 180, 320, GREEN, Some(BLACK))?;
-
-        Ok(())
-    }
-
-    /// 更新错误界面
-    fn update_error(&mut self, error_msg: String) -> Result<()> {
-        // 绘制错误界面
-        self.graphics
-            .draw_text("错误", 180, 100, RED, Some(BLACK))?;
-        self.graphics
-            .draw_text(&error_msg, 180, 140, WHITE, Some(BLACK))?;
-        self.graphics
-            .draw_text("按任意键继续", 180, 220, BLUE, Some(BLACK))?;
-
-        // 3秒后自动返回欢迎界面
-        if self.state_timer > 150 {
-            self.enter_welcome()?;
-        }
 
         Ok(())
     }
@@ -283,64 +208,6 @@ impl<'a> ChatApp<'a> {
         } else {
             log::info!("无法退出晃动状态，持续时间不足");
         }
-
-        Ok(())
-    }
-
-    /// 更新思考状态
-    fn update_thinking(&mut self) -> Result<()> {
-        // 绘制思考界面
-        self.graphics
-            .draw_text("思考中...", 180, 150, WHITE, Some(BLACK))?;
-
-        // 绘制简单的加载动画
-        let dots = match (self.state_timer / 10) % 4 {
-            0 => "   ",
-            1 => ".  ",
-            2 => ".. ",
-            3 => "...",
-            _ => "   ",
-        };
-        self.graphics
-            .draw_text(dots, 180, 200, GREEN, Some(BLACK))?;
-
-        Ok(())
-    }
-
-    /// 更新晃动状态
-    fn update_dizziness(&mut self) -> Result<()> {
-        // Draw dizziness screen
-        self.graphics
-            .draw_text("Ah! So dizzy!", 180, 120, RED, Some(BLACK))?;
-
-        // Draw shaking effect text
-        let shake_text = match (self.state_timer / 5) % 3 {
-            0 => "Shaking...",
-            1 => "Spinning...",
-            2 => "Feeling dizzy...",
-            _ => "Shaking...",
-        };
-        self.graphics
-            .draw_text(shake_text, 180, 160, WHITE, Some(BLACK))?;
-
-        // Draw prompt message
-        self.graphics
-            .draw_text("Please stop shaking", 180, 200, BLUE, Some(BLACK))?;
-
-        // Draw return hint
-        self.graphics
-            .draw_text("Will return when stable", 180, 240, GREEN, Some(BLACK))?;
-
-        Ok(())
-    }
-
-    /// 更新倾斜状态
-    fn update_tilting(&mut self) -> Result<()> {
-        // 绘制倾斜状态
-        self.graphics
-            .draw_text("Device Is Tilting", 180, 150, YELLOW, Some(BLACK))?;
-        self.graphics
-            .draw_text("Please Keep The Device Level", 180, 200, WHITE, Some(BLACK))?;
 
         Ok(())
     }
