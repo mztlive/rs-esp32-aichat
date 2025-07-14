@@ -1,8 +1,7 @@
 use anyhow::Result;
-use esp_idf_hal::delay::FreeRtos;
 
 use crate::graphics::{
-    colors::{BLACK, BLUE, GREEN, RED, WHITE},
+    colors::{BLACK, BLUE, GREEN, RED, WHITE, YELLOW},
     layout::ScreenRect,
     primitives::GraphicsPrimitives,
 };
@@ -22,6 +21,9 @@ pub enum AppState {
 
     /// 当设备被摇晃时
     Dizziness,
+
+    /// 设备倾斜
+    Tilting,
 
     /// 错误界面
     Error(String),
@@ -50,8 +52,6 @@ pub struct ChatApp<'a> {
     graphics: GraphicsPrimitives<'a>,
     /// 状态切换计时器（用于自动切换）
     state_timer: u32,
-    /// 消息列表（为未来扩展准备）
-    messages: Vec<String>,
     /// 晃动状态开始时间
     dizziness_start_time: u32,
 }
@@ -63,7 +63,6 @@ impl<'a> ChatApp<'a> {
             state: AppState::Welcome,
             graphics,
             state_timer: 0,
-            messages: Vec::new(),
             dizziness_start_time: 0,
         }
     }
@@ -81,37 +80,32 @@ impl<'a> ChatApp<'a> {
             AppState::Error(msg) => self.update_error(msg.clone())?,
             AppState::Thinking => self.update_thinking()?,
             AppState::Dizziness => self.update_dizziness()?,
+            AppState::Tilting => self.update_tilting()?,
         }
 
         Ok(())
     }
 
     /// 处理用户输入
-    pub fn handle_input(&mut self, input: UserInput) -> Result<()> {
-        match (&self.state, input) {
+    pub fn back(&mut self) -> Result<()> {
+        println!("处理返回操作");
+
+        match &self.state {
             // 欢迎界面：任意按键进入主界面
-            (AppState::Welcome, UserInput::ButtonPress) => {
-                self.transition_to(AppState::Main)?;
-            }
-
-            // 主界面：设置键进入设置界面
-            (AppState::Main, UserInput::Settings) => {
-                self.transition_to(AppState::Settings)?;
-            }
-
-            // 设置界面：返回键回到主界面
-            (AppState::Settings, UserInput::Back) => {
-                self.transition_to(AppState::Main)?;
-            }
-
-            // 错误界面：任意按键回到欢迎界面
-            (AppState::Error(_), UserInput::ButtonPress) => {
-                self.transition_to(AppState::Welcome)?;
+            AppState::Welcome => {
+                self.enter_main()?;
             }
 
             // 晃动状态：返回键回到主界面
-            (AppState::Dizziness, UserInput::Back) => {
-                self.transition_to(AppState::Main)?;
+            AppState::Dizziness => {
+                if self.can_exit_dizziness() {
+                    self.exit_diszziness()?;
+                }
+            }
+
+            // 设备倾斜
+            AppState::Tilting => {
+                self.enter_main()?;
             }
 
             // 其他输入忽略
@@ -123,6 +117,11 @@ impl<'a> ChatApp<'a> {
 
     /// 状态转换
     fn transition_to(&mut self, new_state: AppState) -> Result<()> {
+        // 如果新状态和当前状态相同，则不进行任何操作
+        if self.state == new_state {
+            return Ok(());
+        }
+
         println!("状态转换: {:?} -> {:?}", self.state, new_state);
         self.state = new_state;
         self.state_timer = 0; // 重置计时器
@@ -208,7 +207,7 @@ impl<'a> ChatApp<'a> {
 
         // 3秒后自动返回欢迎界面
         if self.state_timer > 150 {
-            self.transition_to(AppState::Welcome)?;
+            self.enter_welcome()?;
         }
 
         Ok(())
@@ -219,23 +218,29 @@ impl<'a> ChatApp<'a> {
         &self.state
     }
 
-    /// 添加消息（为未来扩展准备）
-    pub fn add_message(&mut self, message: String) {
-        self.messages.push(message);
-        // 限制消息数量
-        if self.messages.len() > 50 {
-            self.messages.remove(0);
-        }
+    /// 统一的状态转换方法
+    pub fn enter_welcome(&mut self) -> Result<()> {
+        self.transition_to(AppState::Welcome)
     }
 
-    /// 模拟错误发生
-    pub fn simulate_error(&mut self, error_msg: String) -> Result<()> {
-        self.transition_to(AppState::Error(error_msg))?;
-        Ok(())
+    pub fn enter_main(&mut self) -> Result<()> {
+        self.transition_to(AppState::Main)
+    }
+
+    pub fn enter_settings(&mut self) -> Result<()> {
+        self.transition_to(AppState::Settings)
+    }
+
+    pub fn enter_thinking(&mut self) -> Result<()> {
+        self.transition_to(AppState::Thinking)
     }
 
     /// 进入晃动状态
     pub fn enter_dizziness(&mut self) -> Result<()> {
+        if self.state == AppState::Dizziness {
+            return Ok(()); // 已经在晃动状态，直接返回
+        }
+
         // 记录进入晃动状态的全局时间，而不是相对于状态转换的时间
         self.dizziness_start_time = self.state_timer;
         println!("进入晃动状态，记录开始时间: {}", self.dizziness_start_time);
@@ -243,6 +248,18 @@ impl<'a> ChatApp<'a> {
         // 重新设置开始时间，因为transition_to会重置state_timer
         self.dizziness_start_time = 0;
         Ok(())
+    }
+
+    pub fn enter_tilting(&mut self) -> Result<()> {
+        if self.state == AppState::Dizziness {
+            return Ok(()); // 已经在晃动状态，直接返回
+        }
+
+        self.transition_to(AppState::Tilting)
+    }
+
+    pub fn enter_error(&mut self, error_msg: String) -> Result<()> {
+        self.transition_to(AppState::Error(error_msg))
     }
 
     /// 检查是否可以退出晃动状态
@@ -257,6 +274,17 @@ impl<'a> ChatApp<'a> {
         let can_exit = self.state_timer >= MIN_DIZZINESS_DURATION;
 
         can_exit
+    }
+
+    pub fn exit_diszziness(&mut self) -> Result<()> {
+        if self.can_exit_dizziness() {
+            log::info!("退出晃动状态");
+            self.enter_main()?;
+        } else {
+            log::info!("无法退出晃动状态，持续时间不足");
+        }
+
+        Ok(())
     }
 
     /// 更新思考状态
@@ -302,6 +330,17 @@ impl<'a> ChatApp<'a> {
         // Draw return hint
         self.graphics
             .draw_text("Will return when stable", 180, 240, GREEN, Some(BLACK))?;
+
+        Ok(())
+    }
+
+    /// 更新倾斜状态
+    fn update_tilting(&mut self) -> Result<()> {
+        // 绘制倾斜状态
+        self.graphics
+            .draw_text("Device Is Tilting", 180, 150, YELLOW, Some(BLACK))?;
+        self.graphics
+            .draw_text("Please Keep The Device Level", 180, 200, WHITE, Some(BLACK))?;
 
         Ok(())
     }
