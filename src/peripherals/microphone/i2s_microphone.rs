@@ -138,13 +138,11 @@ impl I2sMicrophone {
         let byte_len = buffer.len() * 2; // 每个i16样本需要2个字节
         let mut byte_buffer = vec![0u8; byte_len];
 
-        println!("尝试从I2S读取 {} 字节...", byte_len);
 
         // 从I2S驱动读取原始字节数据，使用超时
         let timeout = esp_idf_hal::delay::TickType::new_millis(100);
         let bytes_read = self.i2s_driver.read(&mut byte_buffer, timeout.into())?;
 
-        println!("成功从I2S读取 {} 字节", bytes_read);
 
         // 将读取的字节数转换为样本数
         let samples_read = bytes_read / 2;
@@ -158,6 +156,74 @@ impl I2sMicrophone {
         }
 
         Ok(samples_read.min(buffer.len()))
+    }
+
+    /// 录制指定时长的音频到缓冲区
+    ///
+    /// # 参数
+    /// * `audio_buffer` - 目标音频缓冲区
+    /// * `duration_seconds` - 录制时长（秒）
+    /// * `chunk_size` - 每次读取的样本数
+    ///
+    /// # 返回
+    /// 返回实际录制的样本数或错误
+    pub fn record_duration(
+        &mut self,
+        audio_buffer: &mut AudioBuffer,
+        duration_seconds: u32,
+        chunk_size: usize,
+    ) -> Result<usize> {
+        let target_samples = (self.sample_rate * duration_seconds) as usize;
+        let mut total_samples = 0;
+
+        while total_samples < target_samples {
+            let samples_written = self.read_to_buffer(audio_buffer, chunk_size)?;
+            total_samples += samples_written;
+
+            // 检查缓冲区是否已满
+            if audio_buffer.available_write() < chunk_size {
+                break; // 缓冲区满了，停止录制
+            }
+        }
+
+        Ok(total_samples)
+    }
+
+    /// 录制指定时长的音频，支持回调处理
+    ///
+    /// # 参数
+    /// * `duration_seconds` - 录制时长（秒）
+    /// * `chunk_size` - 每次读取的样本数
+    /// * `callback` - 处理音频数据的回调函数
+    ///
+    /// # 返回
+    /// 返回实际录制的样本数或错误
+    pub fn record_with_callback<F>(
+        &mut self,
+        duration_seconds: u32,
+        chunk_size: usize,
+        mut callback: F,
+    ) -> Result<usize>
+    where
+        F: FnMut(&[i16]) -> bool, // 返回true继续录制，false停止
+    {
+        let target_samples = (self.sample_rate * duration_seconds) as usize;
+        let mut total_samples = 0;
+        let mut temp_buffer = vec![0i16; chunk_size];
+
+        while total_samples < target_samples {
+            let samples_read = self.read_samples(&mut temp_buffer)?;
+            if samples_read > 0 {
+                total_samples += samples_read;
+                
+                // 调用回调函数处理音频数据
+                if !callback(&temp_buffer[..samples_read]) {
+                    break; // 回调函数返回false，停止录制
+                }
+            }
+        }
+
+        Ok(total_samples)
     }
 
     /// 连续读取音频数据到AudioBuffer

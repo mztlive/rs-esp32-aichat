@@ -62,28 +62,27 @@ fn main() -> Result<()> {
         }
     };
 
-    let mut buffer = AudioBuffer::new(8192);
+    // 创建足够大的缓冲区：3秒 * 16000Hz = 48000样本
+    let mut buffer = AudioBuffer::new(48000);
     mic.start_recording()?;
     println!("mic initialized");
 
-    println!("尝试读取音频数据...");
-
-    // 尝试读取几次，每次都有超时
-    for attempt in 1..=3 {
-        println!("第 {} 次尝试读取音频数据", attempt);
-        match mic.read_to_buffer(&mut buffer, 256) {
-            Ok(size) => {
-                println!("成功读取 {} 个样本", size);
-                break;
-            }
-            Err(e) => {
-                println!("第 {} 次读取失败: {}", attempt, e);
-                if attempt == 3 {
-                    println!("多次尝试后仍然失败，可能是硬件问题");
-                }
-            }
+    // 使用便捷方法录制3秒音频
+    println!("开始录制3秒音频...");
+    match mic.record_duration(&mut buffer, 3, 256) {
+        Ok(total_samples) => {
+            println!(
+                "录音完成! 录制了 {} 个样本 ({:.1}秒)",
+                total_samples,
+                total_samples as f32 / 16000.0
+            );
+            println!(
+                "缓冲区状态: 已用={}, 可用={}",
+                buffer.available_read(),
+                buffer.available_write()
+            );
         }
-        FreeRtos::delay_ms(100);
+        Err(e) => println!("录音失败: {}", e),
     }
 
     println!("应用启动成功，进入主循环...");
