@@ -8,7 +8,11 @@ mod graphics;
 mod peripherals;
 
 use crate::{
-    actors::display::DisplayActorManager, peripherals::qmi8658::motion_detector::MotionDetector,
+    actors::display::DisplayActorManager,
+    peripherals::{
+        microphone::i2s_microphone::{AudioBuffer, I2sMicrophone},
+        qmi8658::motion_detector::MotionDetector,
+    },
 };
 
 fn main() -> Result<()> {
@@ -24,10 +28,6 @@ fn main() -> Result<()> {
     let sda = p.pins.gpio11;
     let scl = p.pins.gpio10;
     let i2c = p.i2c0;
-
-    // lcd背光控制gpio
-    let bl_io = p.pins.gpio5;
-
     // 初始化 QMI8658 传感器
     println!("正在初始化QMI8658传感器...");
     let mut qmi8658 = peripherals::qmi8658::QMI8658::new(
@@ -40,8 +40,53 @@ fn main() -> Result<()> {
     // 初始化运动检测器
     let mut motion_detector = MotionDetector::new();
 
-    println!("应用启动成功，进入主循环...");
+    // lcd背光控制gpio
+    let bl_io = p.pins.gpio5;
     let app = DisplayActorManager::new(bl_io);
+
+    // mic gpio
+    let i2s = p.i2s0;
+    let ws = p.pins.gpio2;
+    let sck = p.pins.gpio15;
+    let sd = p.pins.gpio39;
+
+    println!("正在初始化I2S麦克风...");
+    let mut mic = match I2sMicrophone::new(i2s, ws, sck, sd, 16000) {
+        Ok(m) => {
+            println!("I2S麦克风初始化成功");
+            m
+        }
+        Err(e) => {
+            println!("I2S麦克风初始化失败: {}", e);
+            return Err(e);
+        }
+    };
+
+    let mut buffer = AudioBuffer::new(8192);
+    mic.start_recording()?;
+    println!("mic initialized");
+
+    println!("尝试读取音频数据...");
+
+    // 尝试读取几次，每次都有超时
+    for attempt in 1..=3 {
+        println!("第 {} 次尝试读取音频数据", attempt);
+        match mic.read_to_buffer(&mut buffer, 256) {
+            Ok(size) => {
+                println!("成功读取 {} 个样本", size);
+                break;
+            }
+            Err(e) => {
+                println!("第 {} 次读取失败: {}", attempt, e);
+                if attempt == 3 {
+                    println!("多次尝试后仍然失败，可能是硬件问题");
+                }
+            }
+        }
+        FreeRtos::delay_ms(100);
+    }
+
+    println!("应用启动成功，进入主循环...");
 
     loop {
         let sensor_data = qmi8658.read_sensor_data()?;

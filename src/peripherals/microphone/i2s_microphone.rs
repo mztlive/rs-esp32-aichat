@@ -1,21 +1,16 @@
 use anyhow::Result;
-use esp_idf_hal::gpio::{Gpio15, Gpio2, Gpio39};
+use esp_idf_hal::gpio::{Gpio15, Gpio2, Gpio39, Pin};
 use esp_idf_hal::i2s::{
     config::{
         Config, DataBitWidth, SlotMode, StdClkConfig, StdConfig, StdGpioConfig, StdSlotConfig,
     },
     I2sDriver, I2sRx, I2S0,
 };
-use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
 
 pub struct I2sMicrophone {
-    _i2s_driver: I2sDriver<'static, I2sRx>,
+    i2s_driver: I2sDriver<'static, I2sRx>,
     sample_rate: u32,
-    is_recording: Arc<Mutex<bool>>,
-    audio_sender: Option<Sender<Vec<i16>>>,
+    is_recording: bool,
 }
 
 impl I2sMicrophone {
@@ -37,6 +32,11 @@ impl I2sMicrophone {
         sd_pin: Gpio39,
         sample_rate: u32,
     ) -> Result<Self> {
+        println!(
+            "配置I2S: 采样率={}Hz, 数据位宽=16bit, 模式=Mono",
+            sample_rate
+        );
+
         let std_cfg = StdConfig::new(
             Config::new().auto_clear(true),
             StdClkConfig::from_sample_rate_hz(sample_rate),
@@ -44,20 +44,28 @@ impl I2sMicrophone {
             StdGpioConfig::new(false, false, false),
         );
 
+        println!(
+            "初始化I2S驱动: SCK=GPIO{}, SD=GPIO{}, WS=GPIO{}",
+            sck_pin.pin(),
+            sd_pin.pin(),
+            ws_pin.pin()
+        );
+
         let driver = I2sDriver::new_std_rx(
             i2s_peripheral,
             &std_cfg,
-            sck_pin,
-            sd_pin,
-            None::<Gpio2>, // mclk
-            ws_pin,
+            sck_pin,       // 串行时钟
+            sd_pin,        // 串行数据
+            None::<Gpio2>, // mclk (主时钟，通常不需要)
+            ws_pin,        // 字选择/帧同步
         )?;
 
+        println!("I2S驱动初始化完成");
+
         Ok(Self {
-            _i2s_driver: driver,
+            i2s_driver: driver,
             sample_rate,
-            is_recording: Arc::new(Mutex::new(false)),
-            audio_sender: None,
+            is_recording: false,
         })
     }
 
@@ -71,43 +79,24 @@ impl I2sMicrophone {
 
     /// 开始录音
     ///
-    /// 启动录音线程并返回音频数据接收器
-    ///
-    /// # 返回
-    /// 返回用于接收音频数据的接收器或错误
-    pub fn start_recording(&mut self) -> Result<Receiver<Vec<i16>>> {
-        let (sender, receiver) = std::sync::mpsc::channel();
-        self.audio_sender = Some(sender.clone());
-
-        {
-            let mut recording = self.is_recording.lock().unwrap();
-            *recording = true;
-        }
-
-        let is_recording = Arc::clone(&self.is_recording);
-        thread::spawn(move || {
-            let buffer = vec![0i16; 1024];
-
-            while *is_recording.lock().unwrap() {
-                if sender.send(buffer.clone()).is_err() {
-                    break;
-                }
-                thread::sleep(Duration::from_millis(10));
-            }
-        });
-
-        Ok(receiver)
+    /// 启用I2S通道并设置麦克风为录音状态
+    pub fn start_recording(&mut self) -> Result<()> {
+        println!("启用I2S通道...");
+        self.i2s_driver.rx_enable()?;
+        self.is_recording = true;
+        println!("I2S通道已启用，开始录音");
+        Ok(())
     }
 
     /// 停止录音
     ///
-    /// 停止录音线程并清理相关资源
-    pub fn stop_recording(&mut self) {
-        {
-            let mut recording = self.is_recording.lock().unwrap();
-            *recording = false;
-        }
-        self.audio_sender = None;
+    /// 禁用I2S通道并设置麦克风为停止录音状态
+    pub fn stop_recording(&mut self) -> Result<()> {
+        println!("禁用I2S通道...");
+        self.i2s_driver.rx_disable()?;
+        self.is_recording = false;
+        println!("I2S通道已禁用，停止录音");
+        Ok(())
     }
 
     /// 检查是否正在录音
@@ -115,7 +104,7 @@ impl I2sMicrophone {
     /// # 返回
     /// 如果正在录音返回true，否则返回false
     pub fn is_recording(&self) -> bool {
-        *self.is_recording.lock().unwrap()
+        self.is_recording
     }
 
     /// 设置采样率
@@ -145,17 +134,60 @@ impl I2sMicrophone {
             return Err(anyhow::anyhow!("麦克风未在录音状态"));
         }
 
-        for (i, sample) in buffer.iter_mut().enumerate() {
-            *sample = (i as i16) * 100;
+        // 将i16缓冲区转换为u8缓冲区进行I2S读取
+        let byte_len = buffer.len() * 2; // 每个i16样本需要2个字节
+        let mut byte_buffer = vec![0u8; byte_len];
+
+        println!("尝试从I2S读取 {} 字节...", byte_len);
+
+        // 从I2S驱动读取原始字节数据，使用超时
+        let timeout = esp_idf_hal::delay::TickType::new_millis(100);
+        let bytes_read = self.i2s_driver.read(&mut byte_buffer, timeout.into())?;
+
+        println!("成功从I2S读取 {} 字节", bytes_read);
+
+        // 将读取的字节数转换为样本数
+        let samples_read = bytes_read / 2;
+
+        // 将字节数据转换为i16样本（小端序）
+        for i in 0..samples_read.min(buffer.len()) {
+            let byte_idx = i * 2;
+            if byte_idx + 1 < byte_buffer.len() {
+                buffer[i] = i16::from_le_bytes([byte_buffer[byte_idx], byte_buffer[byte_idx + 1]]);
+            }
         }
 
-        Ok(buffer.len())
+        Ok(samples_read.min(buffer.len()))
+    }
+
+    /// 连续读取音频数据到AudioBuffer
+    ///
+    /// # 参数
+    /// * `audio_buffer` - 目标音频缓冲区
+    /// * `chunk_size` - 每次读取的样本数
+    ///
+    /// # 返回
+    /// 返回实际写入缓冲区的样本数或错误
+    pub fn read_to_buffer(
+        &mut self,
+        audio_buffer: &mut AudioBuffer,
+        chunk_size: usize,
+    ) -> Result<usize> {
+        let mut temp_buffer = vec![0i16; chunk_size];
+        let samples_read = self.read_samples(&mut temp_buffer)?;
+
+        if samples_read > 0 {
+            let written = audio_buffer.write(&temp_buffer[..samples_read]);
+            Ok(written)
+        } else {
+            Ok(0)
+        }
     }
 }
 
 impl Drop for I2sMicrophone {
     fn drop(&mut self) {
-        self.stop_recording();
+        let _ = self.stop_recording();
     }
 }
 
