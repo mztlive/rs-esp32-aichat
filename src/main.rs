@@ -68,16 +68,13 @@ fn main() -> Result<()> {
     let bl_io = p.pins.gpio5;
     let app = DisplayActorManager::new(bl_io);
 
-    // 等待LCD初始化完成
-    std::thread::sleep(std::time::Duration::from_millis(3000));
-
     println!("应用启动成功，进入主循环...");
 
     loop {
         let sensor_data = qmi8658.read_sensor_data()?;
         let motion_state = motion_detector.detect_motion(&sensor_data);
 
-        app.on_motion(motion_state)?;
+        // app.on_motion(motion_state)?;
 
         FreeRtos::delay_ms(50);
     }

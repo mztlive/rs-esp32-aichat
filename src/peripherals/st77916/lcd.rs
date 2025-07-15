@@ -266,6 +266,12 @@ impl LcdController {
         self.draw_bitmap(x, y, x + 1, y + 1, &buffer)?;
         Ok(())
     }
+
+    #[inline(always)]
+    fn color_to_u16(c: embedded_graphics::pixelcolor::Rgb565) -> u16 {
+        let raw = ((c.r() as u16) << 11) | ((c.g() as u16) << 5) | (c.b() as u16);
+        raw.swap_bytes() // ST77916/ILI 等常见面板要求大端序
+    }
 }
 
 // 为LcdController实现embedded-graphics的DrawTarget trait
@@ -292,10 +298,7 @@ impl DrawTarget for LcdController {
             max_y = max_y.max(coord.y);
 
             // 将Rgb565转换为RGB565格式的u16值，考虑大端序
-            let color_u16 =
-                ((color.r() as u16) << 11) | ((color.g() as u16) << 5) | (color.b() as u16);
-
-            let color_u16 = color_u16.swap_bytes(); // 大端序需要交换字节
+            let color_u16 = Self::color_to_u16(color);
 
             pixel_data.push((coord, color_u16));
         }

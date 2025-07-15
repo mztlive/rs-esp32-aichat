@@ -57,7 +57,7 @@ impl DisplayActorManager {
         let (sender, receiver) = std::sync::mpsc::channel::<EventMessage>();
 
         std::thread::Builder::new()
-            .stack_size(32 * 1024) // 32KB stack size for WiFi compatibility
+            .stack_size(32 * 1024)
             .spawn(move || {
                 let mut app_actor = DisplayActor::new(bl_io, receiver).unwrap();
 

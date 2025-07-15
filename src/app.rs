@@ -60,7 +60,7 @@ impl<'a> ChatApp<'a> {
     /// 创建新的应用实例
     pub fn new(graphics: GraphicsPrimitives<'a>) -> Self {
         ChatApp {
-            state: AppState::Welcome,
+            state: AppState::Main,
             graphics,
             state_timer: 0,
             dizziness_start_time: 0,
