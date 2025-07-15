@@ -82,7 +82,7 @@ impl LcdController {
                 __bindgen_anon_4: spi_bus_config_t__bindgen_ty_4 {
                     data3_io_num: QSPI_PIN_NUM_LCD_SDA3,
                 },
-                max_transfer_sz: LCD_WIDTH * 80 * 2,
+                // max_transfer_sz: LCD_WIDTH * 80 * 2,
                 ..Default::default()
             };
 
