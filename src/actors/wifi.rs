@@ -40,6 +40,7 @@ pub struct WifiActor {
     command_receiver: Receiver<WifiCommand>,
     event_sender: Sender<WifiEvent>,
     current_status: WifiStatus,
+    app_event_sender: crate::events::EventSender,
 }
 
 impl WifiActor {
@@ -49,6 +50,7 @@ impl WifiActor {
         nvs: Option<EspDefaultNvsPartition>,
         command_receiver: Receiver<WifiCommand>,
         event_sender: Sender<WifiEvent>,
+        app_event_sender: crate::events::EventSender,
     ) -> Result<Self> {
         let wifi_manager = WifiManager::new(modem, sys_loop, nvs)?;
 
@@ -57,6 +59,7 @@ impl WifiActor {
             command_receiver,
             event_sender,
             current_status: WifiStatus::Disconnected,
+            app_event_sender,
         })
     }
 
@@ -106,16 +109,28 @@ impl WifiActor {
 
                         if let Ok(ip) = self.wifi_manager.get_ip_info() {
                             let ip_str = format!("{}", ip);
-                            let _ = self.event_sender.send(WifiEvent::Connected(ip_str));
+                            let _ = self.event_sender.send(WifiEvent::Connected(ip_str.clone()));
+                            let _ = crate::events::send_wifi_event(
+                                &self.app_event_sender,
+                                WifiEvent::Connected(ip_str),
+                            );
                         } else {
                             let _ = self
                                 .event_sender
                                 .send(WifiEvent::Connected("Unknown IP".to_string()));
+                            let _ = crate::events::send_wifi_event(
+                                &self.app_event_sender,
+                                WifiEvent::Connected("Unknown IP".to_string()),
+                            );
                         }
 
                         let _ = self
                             .event_sender
                             .send(WifiEvent::StatusUpdate(WifiStatus::Connected));
+                        let _ = crate::events::send_wifi_event(
+                            &self.app_event_sender,
+                            WifiEvent::StatusUpdate(WifiStatus::Connected),
+                        );
                     }
                     Err(e) => {
                         let error_msg = format!("WiFi connection failed: {}", e);
@@ -123,10 +138,18 @@ impl WifiActor {
                         self.current_status = WifiStatus::Error(error_msg.clone());
                         let _ = self
                             .event_sender
-                            .send(WifiEvent::ConnectionFailed(error_msg));
+                            .send(WifiEvent::ConnectionFailed(error_msg.clone()));
+                        let _ = crate::events::send_wifi_event(
+                            &self.app_event_sender,
+                            WifiEvent::ConnectionFailed(error_msg),
+                        );
                         let _ = self
                             .event_sender
                             .send(WifiEvent::StatusUpdate(WifiStatus::Disconnected));
+                        let _ = crate::events::send_wifi_event(
+                            &self.app_event_sender,
+                            WifiEvent::StatusUpdate(WifiStatus::Disconnected),
+                        );
                     }
                 }
             }
@@ -136,9 +159,17 @@ impl WifiActor {
                     Ok(_) => {
                         self.current_status = WifiStatus::Disconnected;
                         let _ = self.event_sender.send(WifiEvent::Disconnected);
+                        let _ = crate::events::send_wifi_event(
+                            &self.app_event_sender,
+                            WifiEvent::Disconnected,
+                        );
                         let _ = self
                             .event_sender
                             .send(WifiEvent::StatusUpdate(WifiStatus::Disconnected));
+                        let _ = crate::events::send_wifi_event(
+                            &self.app_event_sender,
+                            WifiEvent::StatusUpdate(WifiStatus::Disconnected),
+                        );
                     }
                     Err(e) => {
                         let error_msg = format!("WiFi disconnect failed: {}", e);
@@ -235,6 +266,7 @@ impl WifiActorManager {
         modem: Modem,
         sys_loop: EspSystemEventLoop,
         nvs: Option<EspDefaultNvsPartition>,
+        app_event_sender: crate::events::EventSender,
     ) -> Result<Self> {
         let (command_sender, command_receiver) = std::sync::mpsc::channel::<WifiCommand>();
         let (event_sender, event_receiver) = std::sync::mpsc::channel::<WifiEvent>();
@@ -251,6 +283,7 @@ impl WifiActorManager {
                     nvs,
                     command_receiver,
                     event_sender_clone.clone(),
+                    app_event_sender,
                 ) {
                     Ok(mut actor) => {
                         actor.run();

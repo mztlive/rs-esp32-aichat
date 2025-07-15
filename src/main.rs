@@ -7,12 +7,14 @@ use esp_idf_sys::{heap_caps_get_free_size, heap_caps_get_largest_free_block, MAL
 mod actors;
 mod api;
 mod display;
+mod events;
 mod graphics;
 mod peripherals;
 
 use crate::{
     actors::wifi::WifiActorManager,
     display::Display,
+    events::{send_motion_event, AppEvent, EventBus, EventHandler},
     graphics::primitives::GraphicsPrimitives,
     peripherals::{
         qmi8658::motion_detector::MotionDetector, st77916::lcd::LcdController, wifi::WifiConfig,
@@ -44,12 +46,16 @@ fn main() -> Result<()> {
     // 初始化运动检测器
     let mut motion_detector = MotionDetector::new();
 
+    // 创建事件总线
+    let mut event_bus = EventBus::new();
+    let event_sender = event_bus.get_sender();
+
     // 然后初始化WiFi系统
     let sys_loop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
 
     println!("正在初始化WiFi...");
-    let wifi_actor = WifiActorManager::new(p.modem, sys_loop, Some(nvs))?;
+    let wifi_actor = WifiActorManager::new(p.modem, sys_loop, Some(nvs), event_sender.clone())?;
 
     let wifi_config = WifiConfig::new("fushangyun", "fsy@666888");
 
@@ -71,32 +77,24 @@ fn main() -> Result<()> {
     println!("应用启动成功，进入主循环...");
 
     loop {
+        // 读取传感器数据并检测运动
         let sensor_data = qmi8658.read_sensor_data()?;
         let motion_state = motion_detector.detect_motion(&sensor_data);
 
-        display.on_motion(motion_state).unwrap();
-        display.update().unwrap();
+        // 发送运动事件
+        if let Err(e) = send_motion_event(&event_sender, motion_state) {
+            eprintln!("发送运动事件失败: {}", e);
+        }
 
-        // 处理WiFi事件
-        while let Ok(wifi_event) = wifi_actor.try_recv_event() {
-            match wifi_event {
-                crate::actors::wifi::WifiEvent::Connected(ip) => {
-                    println!("WiFi连接成功! IP: {}", ip);
-                }
-                crate::actors::wifi::WifiEvent::Disconnected => {
-                    println!("WiFi连接断开");
-                }
-                crate::actors::wifi::WifiEvent::ConnectionFailed(error) => {
-                    println!("WiFi连接失败: {}", error);
-                }
-                crate::actors::wifi::WifiEvent::StatusUpdate(status) => {
-                    println!("WiFi状态更新: {:?}", status);
-                }
-                crate::actors::wifi::WifiEvent::ScanResult(networks) => {
-                    println!("扫描到的网络: {:?}", networks);
-                }
+        // 处理所有事件
+        while let Ok(event) = event_bus.try_recv() {
+            if let Err(e) = display.handle_event(event) {
+                eprintln!("处理事件失败: {}", e);
             }
         }
+
+        // 更新显示
+        display.update().unwrap();
 
         FreeRtos::delay_ms(50);
     }
