@@ -2,6 +2,7 @@
 use anyhow::Result;
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 use esp_idf_svc::{eventloop::EspSystemEventLoop, nvs::EspDefaultNvsPartition};
+use esp_idf_sys::{heap_caps_get_free_size, heap_caps_get_largest_free_block, MALLOC_CAP_INTERNAL};
 
 mod actors;
 mod api;
@@ -44,27 +45,30 @@ fn main() -> Result<()> {
 
     // 初始化运动检测器
     let mut motion_detector = MotionDetector::new();
+    print_internal("before wifi");
 
     // 然后初始化WiFi系统
-    // let sys_loop = EspSystemEventLoop::take()?;
-    // let nvs = EspDefaultNvsPartition::take()?;
-    // println!("正在初始化WiFi...");
-    // let mut wifi_manager = WifiManager::new(p.modem, sys_loop, Some(nvs))?;
+    let sys_loop = EspSystemEventLoop::take()?;
+    let nvs = EspDefaultNvsPartition::take()?;
+    println!("正在初始化WiFi...");
+    let mut wifi_manager = WifiManager::new(p.modem, sys_loop, Some(nvs))?;
 
-    // let wifi_config = WifiConfig::new("fushangyun", "fsy@666888");
+    let wifi_config = WifiConfig::new("fushangyun", "fsy@666888");
 
-    // println!("尝试连接WiFi: {}", wifi_config.ssid);
-    // match wifi_manager.connect_with_config(&wifi_config) {
-    //     Ok(_) => {
-    //         println!("WiFi连接成功!");
-    //         if let Ok(ip) = wifi_manager.get_ip_info() {
-    //             println!("IP地址: {:?}", ip);
-    //         }
-    //     }
-    //     Err(e) => {
-    //         println!("WiFi连接失败: {:?}", e);
-    //     }
-    // }
+    println!("尝试连接WiFi: {}", wifi_config.ssid);
+    match wifi_manager.connect_with_config(&wifi_config) {
+        Ok(_) => {
+            println!("WiFi连接成功!");
+            if let Ok(ip) = wifi_manager.get_ip_info() {
+                println!("IP地址: {:?}", ip);
+            }
+        }
+        Err(e) => {
+            println!("WiFi连接失败: {:?}", e);
+        }
+    }
+
+    print_internal("after wifi");
 
     // mic gpio
     // let i2s = p.i2s0;
@@ -90,4 +94,10 @@ fn main() -> Result<()> {
 
         FreeRtos::delay_ms(50);
     }
+}
+
+fn print_internal(tag: &str) {
+    let free = unsafe { heap_caps_get_free_size(MALLOC_CAP_INTERNAL) };
+    let large = unsafe { heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) };
+    println!("{tag}: free={free}  largest={large}");
 }
