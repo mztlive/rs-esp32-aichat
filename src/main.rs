@@ -1,4 +1,3 @@
-
 // src/main.rs
 use anyhow::Result;
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
@@ -9,8 +8,7 @@ mod graphics;
 mod peripherals;
 
 use crate::{
-    actors::display::DisplayActorManager,
-    peripherals::qmi8658::motion_detector::MotionDetector,
+    actors::display::DisplayActorManager, peripherals::qmi8658::motion_detector::MotionDetector,
 };
 
 fn main() -> Result<()> {
