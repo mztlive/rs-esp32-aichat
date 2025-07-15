@@ -1,8 +1,7 @@
-use std::sync;
 
 // src/main.rs
 use anyhow::Result;
-use esp_idf_hal::{delay::FreeRtos, i2c::I2cConfig, peripherals::Peripherals, prelude::*};
+use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 
 mod actors;
 mod app;
@@ -10,13 +9,8 @@ mod graphics;
 mod peripherals;
 
 use crate::{
-    actors::display::{DisplayActor, DisplayActorManager},
-    app::{ChatApp, UserInput},
-    graphics::primitives::GraphicsPrimitives,
-    peripherals::{
-        qmi8658::motion_detector::{MotionDetector, MotionState},
-        st77916::lcd::LcdController,
-    },
+    actors::display::DisplayActorManager,
+    peripherals::qmi8658::motion_detector::MotionDetector,
 };
 
 fn main() -> Result<()> {

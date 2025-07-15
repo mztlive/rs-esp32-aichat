@@ -2,11 +2,9 @@ pub mod driver;
 pub mod motion_detector;
 
 pub use driver::*;
-pub use motion_detector::*;
 
 use anyhow::Result;
 use driver::{QMI8658Driver, SensorData};
-use motion_detector::{MotionDetector, MotionState};
 
 #[derive(Debug)]
 pub struct QMI8658<'a> {

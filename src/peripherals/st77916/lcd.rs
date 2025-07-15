@@ -1,6 +1,5 @@
 use anyhow::Result;
 use esp_idf_hal::gpio::{Gpio5, PinDriver};
-use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_sys::st77916::{esp_lcd_new_panel_st77916, st77916_vendor_config_t};
 use esp_idf_sys::*;
 use std::ptr;
