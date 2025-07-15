@@ -2,104 +2,91 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 项目简介
+## Project Overview
 
-这是一个基于ESP32-S3的Rust项目，用于控制360x360像素的LCD显示屏（ST77916驱动）。项目实现了完整的图形绘制系统和AI聊天助手应用，支持图像显示、动画播放、文本渲染、运动传感器检测等功能。
+ESP32-S3 based Rust project for an AI chat assistant with 360x360 LCD display (ST77916 driver). Features complete graphics system, animation playback, text rendering, and motion sensor integration using actor pattern architecture.
 
-## 常用命令
+## Build & Deploy Commands
 
-### 构建项目
+### Build Project
 ```bash
-# 使用脚本构建（推荐）
-./scripts/build.sh [debug|release]  # 默认为release模式
+# Using scripts (recommended)
+./scripts/build.sh [debug|release]  # defaults to release
 
-# 直接使用cargo
-cargo build --release   # 发布版本
-cargo build             # 调试版本
+# Direct cargo commands
+cargo build --release   # release build
+cargo build             # debug build
 ```
 
-### 刷机部署
+### Flash to Device
 ```bash
-# 使用脚本刷机（推荐）
-./scripts/flash.sh [debug|release]  # 默认为release模式
+# Using scripts (recommended) 
+./scripts/flash.sh [debug|release]  # defaults to release
 
-# 使用web-flash工具
+# Manual flash
 web-flash --chip esp32s3 target/xtensa-esp32s3-espidf/release/esp32-rs-std
 ```
 
-### 环境准备
+### Environment Setup
 ```bash
-# 加载ESP-IDF环境（如果需要）
+# Load ESP-IDF environment if needed
 source ~/Development/esp32/esp-idf/export.sh
 ```
 
-## 代码架构
+## Architecture
 
-### 模块结构
-- `main.rs` - 主程序入口，实现传感器数据采集和应用主循环
-- `app.rs` - 应用状态机，管理AI聊天助手的不同界面状态
-- `peripherals/` - 外设驱动模块
-  - `st77916/` - ST77916 LCD驱动
-    - `lcd.rs` - LCD控制器，负责硬件初始化和底层绘制
-    - `lcd_cmds.rs` - LCD命令定义和初始化序列
-  - `qmi8658/` - QMI8658运动传感器驱动
-    - `driver.rs` - 传感器底层驱动
-    - `motion_detector.rs` - 运动检测逻辑
-- `graphics/` - 图形绘制模块
-  - `mod.rs` - 模块导出
-  - `layout.rs` - 屏幕布局和坐标定义（九宫格、中心点等）
-  - `primitives.rs` - 基本图形绘制原语
-  - `colors.rs` - 颜色常量定义
-  - `helper.rs` - 辅助函数（颜色转换、几何计算等）
-  - `animation.rs` - 动画播放功能
-  - `ui/` - UI组件
-    - `statusbar.rs` - 状态栏组件
-    - `traits.rs` - UI组件接口定义
+### Actor Pattern Implementation
+- **DisplayActor**: Handles UI rendering and state management in separate thread
+- **DisplayActorManager**: Message passing interface for sensor events
+- **Event System**: Motion events processed through mpsc channels
 
-### 硬件配置
-- **目标芯片**: ESP32-S3
-- **显示屏**: 360x360像素，ST77916驱动，QSPI接口
-- **运动传感器**: QMI8658 六轴传感器，I2C接口
-- **引脚映射**: 
-  - LCD_SCK: GPIO40
-  - LCD_CS: GPIO21  
-  - LCD_SDA0-3: GPIO46/45/42/41
-  - LCD_TE: GPIO18
-  - LCD_BL: GPIO5
-  - I2C_SDA: GPIO11
-  - I2C_SCL: GPIO10
+### Core Module Structure
+- `main.rs` - Entry point with sensor loop and actor initialization
+- `app.rs` - State machine managing chat assistant UI states
+- `actors/display.rs` - Actor pattern implementation for UI thread
+- `peripherals/` - Hardware drivers
+  - `st77916/lcd.rs` - ST77916 LCD controller with QSPI interface
+  - `qmi8658/motion_detector.rs` - Motion detection algorithms
+- `graphics/` - Graphics rendering system
+  - `primitives.rs` - Core drawing operations
+  - `layout.rs` - 360x360 screen grid system and coordinate helpers
+  - `screens/` - State-specific UI screens (welcome, main, dizziness, etc.)
 
-### 图形系统设计
+### State Management
+Application uses enum-based state machine:
+- `AppState::Welcome` → `AppState::Main` → `AppState::Settings`
+- Motion triggers: `MotionState::Shaking` → `AppState::Dizziness`
+- Auto-transitions with timer-based state management
 
-#### 坐标系统
-- **屏幕尺寸**: 360x360像素
-- **九宫格布局**: 每个格子120x120像素
-- **中心点**: (180, 180)
-- 支持九宫格位置快速定位和屏幕中心绘制
+### Hardware Configuration
+- **Target**: ESP32-S3 microcontroller
+- **Display**: 360x360 LCD with ST77916 driver, QSPI interface @ 80MHz
+- **Motion Sensor**: QMI8658 6-axis IMU via I2C
+- **Pin Mapping**:
+  - LCD QSPI: SCK=GPIO40, CS=GPIO21, DATA0-3=GPIO46/45/42/41
+  - LCD Control: TE=GPIO18, BL=GPIO5
+  - I2C: SDA=GPIO11, SCL=GPIO10
 
-#### 绘制功能
-- 基本图形：圆形、矩形、线条
-- 文本渲染：支持多行文本、居中对齐
-- 图像显示：BMP格式支持
-- 动画播放：连续图像帧播放
-- 颜色管理：RGB565格式，预定义颜色常量
+### Graphics System
+- **360x360 screen** with 3x3 grid layout (120x120 per cell)  
+- **Grid positioning** via `GridPosition` enum for quick UI placement
+- **Drawing primitives**: circles, rectangles, text, images (BMP format)
+- **Animation support**: frame-based playback from assets/ directory
+- **Color system**: RGB565 format with predefined constants
+- **Layout helpers**: `graphics/layout.rs` provides screen center (180,180) and grid calculations
 
-## 开发要点
+## Key Development Notes
 
-### 内存管理
-- 使用分块传输减少内存占用
-- 大的图像数据通过`include_bytes!`宏在编译时嵌入
-- 显示缓冲区按需分配
+### Memory & Performance
+- **Chunked transfers** reduce memory usage for large graphics
+- **Asset embedding** via `include_bytes!` at compile time
+- **QSPI @ 80MHz** with DMA acceleration for display updates
+- **Static allocation** using `Box::leak` for LCD controller in actor thread
 
-### 性能优化
-- QSPI接口高速传输（80MHz）
-- 硬件DMA加速
-- 批量像素传输减少系统调用
-
-### 错误处理
-- 使用`anyhow`库进行错误处理
-- 坐标边界检查防止越界
-- 硬件初始化错误的详细报告
+### Error Handling
+- **anyhow crate** for error propagation throughout application
+- **Boundary checking** prevents coordinate overflow on 360x360 display
+- **Hardware validation** with detailed error reporting during init
 
 ## 常见开发任务
 
