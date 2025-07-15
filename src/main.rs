@@ -1,6 +1,7 @@
 // src/main.rs
 use anyhow::Result;
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
+use esp_idf_svc::{eventloop::EspSystemEventLoop, nvs::EspDefaultNvsPartition};
 
 mod actors;
 mod api;
@@ -9,7 +10,14 @@ mod graphics;
 mod peripherals;
 
 use crate::{
-    actors::display::DisplayActorManager, peripherals::qmi8658::motion_detector::MotionDetector,
+    actors::display::DisplayActorManager,
+    app::ChatApp,
+    graphics::{colors::WHITE, primitives::GraphicsPrimitives},
+    peripherals::{
+        qmi8658::motion_detector::MotionDetector,
+        st77916::lcd::LcdController,
+        wifi::{WifiConfig, WifiManager},
+    },
 };
 
 fn main() -> Result<()> {
@@ -66,7 +74,10 @@ fn main() -> Result<()> {
 
     // lcd背光控制gpio - 先初始化显示系统
     let bl_io = p.pins.gpio5;
-    let app = DisplayActorManager::new(bl_io);
+    // let app = DisplayActorManager::new(bl_io);
+    let mut lcd = LcdController::new(bl_io).unwrap();
+    let graphics = GraphicsPrimitives::new(&mut lcd);
+    let mut app = ChatApp::new(graphics);
 
     println!("应用启动成功，进入主循环...");
 
@@ -74,7 +85,8 @@ fn main() -> Result<()> {
         let sensor_data = qmi8658.read_sensor_data()?;
         let motion_state = motion_detector.detect_motion(&sensor_data);
 
-        app.on_motion(motion_state)?;
+        app.on_motion(motion_state).unwrap();
+        app.update().unwrap();
 
         FreeRtos::delay_ms(50);
     }

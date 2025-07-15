@@ -1,9 +1,12 @@
 use anyhow::Result;
 
-use crate::graphics::{
-    colors::BLACK,
-    primitives::GraphicsPrimitives,
-    screens::{dizziness, error, home, settings, thinking, tilting, welcome},
+use crate::{
+    graphics::{
+        colors::BLACK,
+        primitives::GraphicsPrimitives,
+        screens::{dizziness, error, home, settings, thinking, tilting, welcome},
+    },
+    peripherals::qmi8658::motion_detector::MotionState,
 };
 
 /// 应用状态枚举
@@ -204,6 +207,20 @@ impl<'a> ChatApp<'a> {
             self.enter_main()?;
         } else {
             log::info!("无法退出晃动状态，持续时间不足");
+        }
+
+        Ok(())
+    }
+
+    pub fn on_motion(&mut self, state: MotionState) -> Result<()> {
+        match state {
+            MotionState::Shaking => {
+                self.enter_dizziness()?;
+            }
+            MotionState::Still => {
+                self.back()?;
+            }
+            MotionState::Tilting => self.enter_tilting()?,
         }
 
         Ok(())
