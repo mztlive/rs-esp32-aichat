@@ -11,13 +11,11 @@ mod graphics;
 mod peripherals;
 
 use crate::{
-    actors::display::DisplayActorManager,
+    actors::{display::DisplayActorManager, wifi::WifiActorManager},
     app::ChatApp,
     graphics::{colors::WHITE, primitives::GraphicsPrimitives},
     peripherals::{
-        qmi8658::motion_detector::MotionDetector,
-        st77916::lcd::LcdController,
-        wifi::{WifiConfig, WifiManager},
+        qmi8658::motion_detector::MotionDetector, st77916::lcd::LcdController, wifi::WifiConfig,
     },
 };
 
@@ -45,30 +43,17 @@ fn main() -> Result<()> {
 
     // 初始化运动检测器
     let mut motion_detector = MotionDetector::new();
-    print_internal("before wifi");
 
     // 然后初始化WiFi系统
     let sys_loop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
+
     println!("正在初始化WiFi...");
-    let mut wifi_manager = WifiManager::new(p.modem, sys_loop, Some(nvs))?;
+    let wifi_actor = WifiActorManager::new(p.modem, sys_loop, Some(nvs))?;
 
     let wifi_config = WifiConfig::new("fushangyun", "fsy@666888");
 
-    println!("尝试连接WiFi: {}", wifi_config.ssid);
-    match wifi_manager.connect_with_config(&wifi_config) {
-        Ok(_) => {
-            println!("WiFi连接成功!");
-            if let Ok(ip) = wifi_manager.get_ip_info() {
-                println!("IP地址: {:?}", ip);
-            }
-        }
-        Err(e) => {
-            println!("WiFi连接失败: {:?}", e);
-        }
-    }
-
-    print_internal("after wifi");
+    wifi_actor.connect(wifi_config)?;
 
     // mic gpio
     // let i2s = p.i2s0;
@@ -91,6 +76,27 @@ fn main() -> Result<()> {
 
         app.on_motion(motion_state).unwrap();
         app.update().unwrap();
+
+        // 处理WiFi事件
+        while let Ok(wifi_event) = wifi_actor.try_recv_event() {
+            match wifi_event {
+                crate::actors::wifi::WifiEvent::Connected(ip) => {
+                    println!("WiFi连接成功! IP: {}", ip);
+                }
+                crate::actors::wifi::WifiEvent::Disconnected => {
+                    println!("WiFi连接断开");
+                }
+                crate::actors::wifi::WifiEvent::ConnectionFailed(error) => {
+                    println!("WiFi连接失败: {}", error);
+                }
+                crate::actors::wifi::WifiEvent::StatusUpdate(status) => {
+                    println!("WiFi状态更新: {:?}", status);
+                }
+                crate::actors::wifi::WifiEvent::ScanResult(networks) => {
+                    println!("扫描到的网络: {:?}", networks);
+                }
+            }
+        }
 
         FreeRtos::delay_ms(50);
     }

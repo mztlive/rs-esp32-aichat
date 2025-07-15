@@ -6,6 +6,8 @@ use crate::{
     peripherals::{qmi8658::motion_detector::MotionState, st77916::lcd::LcdController},
 };
 
+// 不要使用，会有奇奇怪怪的问题
+
 #[derive(Debug)]
 pub enum EventMessage {
     Motion(MotionState),
