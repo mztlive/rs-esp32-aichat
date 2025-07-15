@@ -138,11 +138,9 @@ impl I2sMicrophone {
         let byte_len = buffer.len() * 2; // 每个i16样本需要2个字节
         let mut byte_buffer = vec![0u8; byte_len];
 
-
         // 从I2S驱动读取原始字节数据，使用超时
         let timeout = esp_idf_hal::delay::TickType::new_millis(100);
         let bytes_read = self.i2s_driver.read(&mut byte_buffer, timeout.into())?;
-
 
         // 将读取的字节数转换为样本数
         let samples_read = bytes_read / 2;
@@ -158,35 +156,56 @@ impl I2sMicrophone {
         Ok(samples_read.min(buffer.len()))
     }
 
-    /// 录制指定时长的音频到缓冲区
+    /// 录制指定时长的音频，返回包含音频数据的缓冲区
     ///
     /// # 参数
-    /// * `audio_buffer` - 目标音频缓冲区
     /// * `duration_seconds` - 录制时长（秒）
-    /// * `chunk_size` - 每次读取的样本数
+    /// * `chunk_size` - 每次读取的样本数（可选，默认256）
     ///
     /// # 返回
-    /// 返回实际录制的样本数或错误
+    /// 返回包含录制音频数据的AudioBuffer或错误
     pub fn record_duration(
         &mut self,
-        audio_buffer: &mut AudioBuffer,
         duration_seconds: u32,
-        chunk_size: usize,
-    ) -> Result<usize> {
+        chunk_size: Option<usize>,
+    ) -> Result<AudioBuffer> {
+        let chunk_size = chunk_size.unwrap_or(256);
         let target_samples = (self.sample_rate * duration_seconds) as usize;
+
+        // 创建足够大的缓冲区，多预留一些空间
+        let buffer_size = target_samples + chunk_size * 2;
+        let mut audio_buffer = AudioBuffer::new(buffer_size);
         let mut total_samples = 0;
 
+        log::info!(
+            "开始录制{}秒音频，目标样本数: {}",
+            duration_seconds,
+            target_samples
+        );
+
         while total_samples < target_samples {
-            let samples_written = self.read_to_buffer(audio_buffer, chunk_size)?;
+            let samples_written = self.read_to_buffer(&mut audio_buffer, chunk_size)?;
             total_samples += samples_written;
 
-            // 检查缓冲区是否已满
-            if audio_buffer.available_write() < chunk_size {
-                break; // 缓冲区满了，停止录制
+            // 每秒打印一次进度
+            if total_samples % self.sample_rate as usize == 0 {
+                let seconds = total_samples / self.sample_rate as usize;
+                log::info!(
+                    "已录制: {}秒 ({}/{}样本)",
+                    seconds,
+                    total_samples,
+                    target_samples
+                );
             }
         }
 
-        Ok(total_samples)
+        log::info!(
+            "录音完成! 总共录制了 {} 个样本 ({:.1}秒)",
+            total_samples,
+            total_samples as f32 / self.sample_rate as f32
+        );
+
+        Ok(audio_buffer)
     }
 
     /// 录制指定时长的音频，支持回调处理
@@ -215,7 +234,7 @@ impl I2sMicrophone {
             let samples_read = self.read_samples(&mut temp_buffer)?;
             if samples_read > 0 {
                 total_samples += samples_read;
-                
+
                 // 调用回调函数处理音频数据
                 if !callback(&temp_buffer[..samples_read]) {
                     break; // 回调函数返回false，停止录制

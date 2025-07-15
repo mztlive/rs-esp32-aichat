@@ -62,25 +62,22 @@ fn main() -> Result<()> {
         }
     };
 
-    // 创建足够大的缓冲区：3秒 * 16000Hz = 48000样本
-    let mut buffer = AudioBuffer::new(48000);
     mic.start_recording()?;
     println!("mic initialized");
 
-    // 使用便捷方法录制3秒音频
-    println!("开始录制3秒音频...");
-    match mic.record_duration(&mut buffer, 3, 256) {
-        Ok(total_samples) => {
-            println!(
-                "录音完成! 录制了 {} 个样本 ({:.1}秒)",
-                total_samples,
-                total_samples as f32 / 16000.0
-            );
+    // 录制3秒音频，方法内部自动管理缓冲区大小
+    match mic.record_duration(3, None) {
+        Ok(mut audio_buffer) => {
             println!(
                 "缓冲区状态: 已用={}, 可用={}",
-                buffer.available_read(),
-                buffer.available_write()
+                audio_buffer.available_read(),
+                audio_buffer.available_write()
             );
+
+            // 可以进一步处理音频数据
+            let mut sample_data = vec![0i16; 1000];
+            let read_count = audio_buffer.read(&mut sample_data);
+            println!("从缓冲区读取了 {} 个样本进行分析", read_count);
         }
         Err(e) => println!("录音失败: {}", e),
     }
