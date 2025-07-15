@@ -3,6 +3,7 @@ use anyhow::Result;
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 
 mod actors;
+mod api;
 mod app;
 mod graphics;
 mod peripherals;
