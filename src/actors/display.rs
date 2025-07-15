@@ -31,8 +31,6 @@ impl DisplayActor {
     }
 
     pub fn handle_event(&mut self, event: EventMessage) -> anyhow::Result<()> {
-        println!("处理事件: {:?}", event);
-
         match event {
             EventMessage::Motion(motion_state) => match motion_state {
                 MotionState::Shaking => {
@@ -58,13 +56,16 @@ impl DisplayActorManager {
     pub fn new(bl_io: Gpio5) -> Self {
         let (sender, receiver) = std::sync::mpsc::channel::<EventMessage>();
 
-        std::thread::spawn(move || {
-            let mut app_actor = DisplayActor::new(bl_io, receiver).unwrap();
+        std::thread::Builder::new()
+            .stack_size(32 * 1024) // 32KB stack size for WiFi compatibility
+            .spawn(move || {
+                let mut app_actor = DisplayActor::new(bl_io, receiver).unwrap();
 
-            while let Ok(event) = app_actor.receiver.recv() {
-                app_actor.handle_event(event).unwrap();
-            }
-        });
+                while let Ok(event) = app_actor.receiver.recv() {
+                    app_actor.handle_event(event).unwrap();
+                }
+            })
+            .expect("Failed to spawn display actor thread");
 
         DisplayActorManager { sender }
     }
