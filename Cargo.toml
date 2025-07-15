@@ -9,10 +9,15 @@ rust-version = "1.77"
 
 [[bin]]
 name = "esp32-rs-std"
-harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+harness = false       # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
 [profile.release]
-opt-level = "s"
+# opt-level = "s"
+opt-level = "z"   # 最高压缩
+lto = true        # 链接时优化
+codegen-units = 1 # 单单元编译更利于 LTO
+panic = "abort"   # 取消 unwinding，减少 panic 代码
+debug = true      # 关闭符号, 真正发布的时候改成false
 
 [profile.dev]
 debug = true    # Symbols are nice and they don't increase the size on Flash
@@ -62,11 +67,11 @@ embuild = "0.33"
 # 告诉 build-script 额外拉取远程组件
 [[package.metadata.esp-idf-sys.extra_components]]
 remote_component = { name = "espressif/esp_lcd_st77916", version = "1.*" }
-bindings_header  = "bindings.h"
-bindings_module  = "st77916"
+bindings_header = "bindings.h"
+bindings_module = "st77916"
 
 
 bindgen_extra_clang_args = [
-  "-I${IDF_PATH}/components/esp_lcd/include",
-  "-I${IDF_PATH}/components/driver/include",
+    "-I${IDF_PATH}/components/esp_lcd/include",
+    "-I${IDF_PATH}/components/driver/include",
 ]

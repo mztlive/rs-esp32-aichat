@@ -1,6 +1,7 @@
 // src/main.rs
 use anyhow::Result;
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
+use esp_idf_svc::{eventloop::EspSystemEventLoop, nvs::EspDefaultNvsPartition};
 
 mod actors;
 mod api;
@@ -9,7 +10,9 @@ mod graphics;
 mod peripherals;
 
 use crate::{
-    actors::display::DisplayActorManager, peripherals::qmi8658::motion_detector::MotionDetector,
+    actors::display::DisplayActorManager,
+    peripherals::qmi8658::motion_detector::MotionDetector,
+    peripherals::wifi::{WifiConfig, WifiManager},
 };
 
 fn main() -> Result<()> {
@@ -36,6 +39,28 @@ fn main() -> Result<()> {
 
     // 初始化运动检测器
     let mut motion_detector = MotionDetector::new();
+
+    // // 初始化WiFi管理器
+    // // 初始化WiFi系统
+    let sys_loop = EspSystemEventLoop::take()?;
+    let nvs = EspDefaultNvsPartition::take()?;
+    println!("正在初始化WiFi...");
+    let mut wifi_manager = WifiManager::new(p.modem, sys_loop, Some(nvs))?;
+
+    let wifi_config = WifiConfig::new("fushangyun", "fsy@666888");
+
+    println!("尝试连接WiFi: {}", wifi_config.ssid);
+    match wifi_manager.connect_with_config(&wifi_config) {
+        Ok(_) => {
+            println!("WiFi连接成功!");
+            if let Ok(ip) = wifi_manager.get_ip_info() {
+                println!("IP地址: {:?}", ip);
+            }
+        }
+        Err(e) => {
+            println!("WiFi连接失败: {:?}", e);
+        }
+    }
 
     // lcd背光控制gpio
     let bl_io = p.pins.gpio5;

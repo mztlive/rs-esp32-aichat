@@ -53,8 +53,7 @@ impl ApiClient {
     }
 
     fn handle_api_error(status: u16, response_text: &str) -> Result<()> {
-        let error_response: ApiResponse<serde_json::Value> =
-            serde_json::from_str(response_text)?;
+        let error_response: ApiResponse<serde_json::Value> = serde_json::from_str(response_text)?;
         Err(anyhow::anyhow!(
             "API error {}: {}",
             status,
@@ -74,7 +73,7 @@ impl ApiClient {
         let status = response.status();
         info!("<- {}", status);
         let response_text = Self::read_response_body(response)?;
-        
+
         Ok((status, response_text))
     }
 
@@ -91,7 +90,7 @@ impl ApiClient {
         let status = response.status();
         info!("<- {}", status);
         let response_text = Self::read_response_body(response)?;
-        
+
         Ok((status, response_text))
     }
 
