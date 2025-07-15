@@ -82,7 +82,7 @@ impl LcdController {
                 __bindgen_anon_4: spi_bus_config_t__bindgen_ty_4 {
                     data3_io_num: QSPI_PIN_NUM_LCD_SDA3,
                 },
-                max_transfer_sz: LCD_WIDTH * LCD_HEIGHT * 2,
+                max_transfer_sz: LCD_WIDTH * 80 * 2, // 32KB限制，避免DMA问题
                 ..Default::default()
             };
 
@@ -108,7 +108,7 @@ impl LcdController {
             cs_gpio_num: QSPI_PIN_NUM_LCD_CS,
             dc_gpio_num: -1, // QSPI模式不需要DC引脚
             spi_mode: 0,
-            pclk_hz: 80_000_000,
+            pclk_hz: 80 * 1000 * 1000,
             trans_queue_depth: 10,
             on_color_trans_done: None,
             user_ctx: ptr::null_mut(),
@@ -224,24 +224,6 @@ impl LcdController {
                 color_data.as_ptr() as *const _
             ))?;
         }
-
-        Ok(())
-    }
-
-    /// 填充整个屏幕（分块传输）
-    pub fn fill_screen(&self, color: u16) -> Result<()> {
-        // 使用分块传输以减少内存使用并提高稳定性
-        const CHUNK_HEIGHT: i32 = 40;
-
-        for y in (0..LCD_HEIGHT).step_by(CHUNK_HEIGHT as usize) {
-            let chunk_height = (CHUNK_HEIGHT).min(LCD_HEIGHT - y);
-            let chunk_size = (LCD_WIDTH * chunk_height) as usize;
-            let buffer = vec![color; chunk_size];
-
-            self.draw_bitmap(0, y, LCD_WIDTH, y + chunk_height, &buffer)?;
-        }
-
-        println!("fill_screen: 填充完成");
 
         Ok(())
     }

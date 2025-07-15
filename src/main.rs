@@ -74,7 +74,7 @@ fn main() -> Result<()> {
         let sensor_data = qmi8658.read_sensor_data()?;
         let motion_state = motion_detector.detect_motion(&sensor_data);
 
-        // app.on_motion(motion_state)?;
+        app.on_motion(motion_state)?;
 
         FreeRtos::delay_ms(50);
     }
