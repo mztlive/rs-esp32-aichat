@@ -11,7 +11,7 @@ use crate::{
 
 /// 应用状态枚举
 #[derive(Debug, Clone, PartialEq)]
-pub enum AppState {
+pub enum DisplayState {
     /// 欢迎界面
     Welcome,
     /// 主界面
@@ -48,9 +48,9 @@ pub enum UserInput {
 }
 
 /// 主应用结构
-pub struct ChatApp<'a> {
+pub struct Display<'a> {
     /// 当前状态
-    state: AppState,
+    state: DisplayState,
     /// 图形绘制接口
     graphics: GraphicsPrimitives<'a>,
     /// 状态切换计时器（用于自动切换）
@@ -59,11 +59,11 @@ pub struct ChatApp<'a> {
     dizziness_start_time: u32,
 }
 
-impl<'a> ChatApp<'a> {
+impl<'a> Display<'a> {
     /// 创建新的应用实例
     pub fn new(graphics: GraphicsPrimitives<'a>) -> Self {
-        ChatApp {
-            state: AppState::Main,
+        Display {
+            state: DisplayState::Main,
             graphics,
             state_timer: 0,
             dizziness_start_time: 0,
@@ -77,19 +77,19 @@ impl<'a> ChatApp<'a> {
 
         // 根据当前状态执行相应逻辑
         match &self.state {
-            AppState::Welcome => welcome::draw(&mut self.graphics)?,
-            AppState::Main => home::draw(&mut self.graphics)?,
-            AppState::Settings => settings::draw(&mut self.graphics)?,
-            AppState::Error(msg) => {
+            DisplayState::Welcome => welcome::draw(&mut self.graphics)?,
+            DisplayState::Main => home::draw(&mut self.graphics)?,
+            DisplayState::Settings => settings::draw(&mut self.graphics)?,
+            DisplayState::Error(msg) => {
                 error::draw(&mut self.graphics, msg)?;
                 // 3秒后自动返回欢迎界面
                 if self.state_timer > 150 {
                     self.enter_welcome()?;
                 }
             }
-            AppState::Thinking => thinking::draw(&mut self.graphics, self.state_timer)?,
-            AppState::Dizziness => dizziness::draw(&mut self.graphics, self.state_timer)?,
-            AppState::Tilting => tilting::draw(&mut self.graphics)?,
+            DisplayState::Thinking => thinking::draw(&mut self.graphics, self.state_timer)?,
+            DisplayState::Dizziness => dizziness::draw(&mut self.graphics, self.state_timer)?,
+            DisplayState::Tilting => tilting::draw(&mut self.graphics)?,
         }
 
         Ok(())
@@ -99,19 +99,19 @@ impl<'a> ChatApp<'a> {
     pub fn back(&mut self) -> Result<()> {
         match &self.state {
             // 欢迎界面：任意按键进入主界面
-            AppState::Welcome => {
+            DisplayState::Welcome => {
                 self.enter_main()?;
             }
 
             // 晃动状态：返回键回到主界面
-            AppState::Dizziness => {
+            DisplayState::Dizziness => {
                 if self.can_exit_dizziness() {
                     self.exit_diszziness()?;
                 }
             }
 
             // 设备倾斜
-            AppState::Tilting => {
+            DisplayState::Tilting => {
                 self.enter_main()?;
             }
 
@@ -123,7 +123,7 @@ impl<'a> ChatApp<'a> {
     }
 
     /// 状态转换
-    fn transition_to(&mut self, new_state: AppState) -> Result<()> {
+    fn transition_to(&mut self, new_state: DisplayState) -> Result<()> {
         // 如果新状态和当前状态相同，则不进行任何操作
         if self.state == new_state {
             return Ok(());
@@ -140,56 +140,56 @@ impl<'a> ChatApp<'a> {
     }
 
     /// 获取当前状态
-    pub fn get_state(&self) -> &AppState {
+    pub fn get_state(&self) -> &DisplayState {
         &self.state
     }
 
     /// 统一的状态转换方法
     pub fn enter_welcome(&mut self) -> Result<()> {
-        self.transition_to(AppState::Welcome)
+        self.transition_to(DisplayState::Welcome)
     }
 
     pub fn enter_main(&mut self) -> Result<()> {
-        self.transition_to(AppState::Main)
+        self.transition_to(DisplayState::Main)
     }
 
     pub fn enter_settings(&mut self) -> Result<()> {
-        self.transition_to(AppState::Settings)
+        self.transition_to(DisplayState::Settings)
     }
 
     pub fn enter_thinking(&mut self) -> Result<()> {
-        self.transition_to(AppState::Thinking)
+        self.transition_to(DisplayState::Thinking)
     }
 
     /// 进入晃动状态
     pub fn enter_dizziness(&mut self) -> Result<()> {
-        if self.state == AppState::Dizziness {
+        if self.state == DisplayState::Dizziness {
             return Ok(()); // 已经在晃动状态，直接返回
         }
 
         // 记录进入晃动状态的全局时间，而不是相对于状态转换的时间
         self.dizziness_start_time = self.state_timer;
-        self.transition_to(AppState::Dizziness)?;
+        self.transition_to(DisplayState::Dizziness)?;
         // 重新设置开始时间，因为transition_to会重置state_timer
         self.dizziness_start_time = 0;
         Ok(())
     }
 
     pub fn enter_tilting(&mut self) -> Result<()> {
-        if self.state == AppState::Dizziness {
+        if self.state == DisplayState::Dizziness {
             return Ok(()); // 已经在晃动状态，直接返回
         }
 
-        self.transition_to(AppState::Tilting)
+        self.transition_to(DisplayState::Tilting)
     }
 
     pub fn enter_error(&mut self, error_msg: String) -> Result<()> {
-        self.transition_to(AppState::Error(error_msg))
+        self.transition_to(DisplayState::Error(error_msg))
     }
 
     /// 检查是否可以退出晃动状态
     pub fn can_exit_dizziness(&self) -> bool {
-        if self.state != AppState::Dizziness {
+        if self.state != DisplayState::Dizziness {
             return false;
         }
 

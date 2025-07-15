@@ -6,14 +6,14 @@ use esp_idf_sys::{heap_caps_get_free_size, heap_caps_get_largest_free_block, MAL
 
 mod actors;
 mod api;
-mod app;
+mod display;
 mod graphics;
 mod peripherals;
 
 use crate::{
-    actors::{display::DisplayActorManager, wifi::WifiActorManager},
-    app::ChatApp,
-    graphics::{colors::WHITE, primitives::GraphicsPrimitives},
+    actors::wifi::WifiActorManager,
+    display::Display,
+    graphics::primitives::GraphicsPrimitives,
     peripherals::{
         qmi8658::motion_detector::MotionDetector, st77916::lcd::LcdController, wifi::WifiConfig,
     },
@@ -66,7 +66,7 @@ fn main() -> Result<()> {
     // let app = DisplayActorManager::new(bl_io);
     let mut lcd = LcdController::new(bl_io).unwrap();
     let graphics = GraphicsPrimitives::new(&mut lcd);
-    let mut app = ChatApp::new(graphics);
+    let mut display = Display::new(graphics);
 
     println!("应用启动成功，进入主循环...");
 
@@ -74,8 +74,8 @@ fn main() -> Result<()> {
         let sensor_data = qmi8658.read_sensor_data()?;
         let motion_state = motion_detector.detect_motion(&sensor_data);
 
-        app.on_motion(motion_state).unwrap();
-        app.update().unwrap();
+        display.on_motion(motion_state).unwrap();
+        display.update().unwrap();
 
         // 处理WiFi事件
         while let Ok(wifi_event) = wifi_actor.try_recv_event() {
