@@ -40,8 +40,14 @@ fn main() -> Result<()> {
     // 初始化运动检测器
     let mut motion_detector = MotionDetector::new();
 
-    // // 初始化WiFi管理器
-    // // 初始化WiFi系统
+    // lcd背光控制gpio - 先初始化显示系统
+    let bl_io = p.pins.gpio5;
+    let app = DisplayActorManager::new(bl_io);
+
+    // 等待LCD初始化完成
+    std::thread::sleep(std::time::Duration::from_millis(200));
+
+    // 然后初始化WiFi系统
     let sys_loop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
     println!("正在初始化WiFi...");
@@ -62,10 +68,6 @@ fn main() -> Result<()> {
         }
     }
 
-    // lcd背光控制gpio
-    let bl_io = p.pins.gpio5;
-    let app = DisplayActorManager::new(bl_io);
-
     // mic gpio
     let i2s = p.i2s0;
     let ws = p.pins.gpio2;
@@ -78,7 +80,6 @@ fn main() -> Result<()> {
         let sensor_data = qmi8658.read_sensor_data()?;
         let motion_state = motion_detector.detect_motion(&sensor_data);
 
-        println!("mation_state is: {:?}", motion_state);
         app.on_motion(motion_state)?;
 
         FreeRtos::delay_ms(50);

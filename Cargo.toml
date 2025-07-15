@@ -75,3 +75,9 @@ bindgen_extra_clang_args = [
     "-I${IDF_PATH}/components/esp_lcd/include",
     "-I${IDF_PATH}/components/driver/include",
 ]
+
+
+[package.metadata.espflash]
+partition_table = "custom_partitions.csv"
+flash_size = "16MB"                       # 可省略，写上更保险
+chip = "esp32s3"                          # 可省略

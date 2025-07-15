@@ -94,8 +94,6 @@ impl<'a> ChatApp<'a> {
 
     /// 处理用户输入
     pub fn back(&mut self) -> Result<()> {
-        println!("处理返回操作");
-
         match &self.state {
             // 欢迎界面：任意按键进入主界面
             AppState::Welcome => {
@@ -168,7 +166,6 @@ impl<'a> ChatApp<'a> {
 
         // 记录进入晃动状态的全局时间，而不是相对于状态转换的时间
         self.dizziness_start_time = self.state_timer;
-        println!("进入晃动状态，记录开始时间: {}", self.dizziness_start_time);
         self.transition_to(AppState::Dizziness)?;
         // 重新设置开始时间，因为transition_to会重置state_timer
         self.dizziness_start_time = 0;
