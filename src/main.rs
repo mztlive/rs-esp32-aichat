@@ -1,7 +1,6 @@
 // src/main.rs
 use anyhow::Result;
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
-use esp_idf_svc::{eventloop::EspSystemEventLoop, nvs::EspDefaultNvsPartition};
 
 mod actors;
 mod api;
@@ -10,9 +9,7 @@ mod graphics;
 mod peripherals;
 
 use crate::{
-    actors::display::DisplayActorManager,
-    peripherals::qmi8658::motion_detector::MotionDetector,
-    peripherals::wifi::{WifiConfig, WifiManager},
+    actors::display::DisplayActorManager, peripherals::qmi8658::motion_detector::MotionDetector,
 };
 
 fn main() -> Result<()> {
@@ -40,39 +37,39 @@ fn main() -> Result<()> {
     // 初始化运动检测器
     let mut motion_detector = MotionDetector::new();
 
+    // 然后初始化WiFi系统
+    // let sys_loop = EspSystemEventLoop::take()?;
+    // let nvs = EspDefaultNvsPartition::take()?;
+    // println!("正在初始化WiFi...");
+    // let mut wifi_manager = WifiManager::new(p.modem, sys_loop, Some(nvs))?;
+
+    // let wifi_config = WifiConfig::new("fushangyun", "fsy@666888");
+
+    // println!("尝试连接WiFi: {}", wifi_config.ssid);
+    // match wifi_manager.connect_with_config(&wifi_config) {
+    //     Ok(_) => {
+    //         println!("WiFi连接成功!");
+    //         if let Ok(ip) = wifi_manager.get_ip_info() {
+    //             println!("IP地址: {:?}", ip);
+    //         }
+    //     }
+    //     Err(e) => {
+    //         println!("WiFi连接失败: {:?}", e);
+    //     }
+    // }
+
+    // mic gpio
+    // let i2s = p.i2s0;
+    // let ws = p.pins.gpio2;
+    // let sck = p.pins.gpio15;
+    // let sd = p.pins.gpio39;
+
     // lcd背光控制gpio - 先初始化显示系统
     let bl_io = p.pins.gpio5;
     let app = DisplayActorManager::new(bl_io);
 
     // 等待LCD初始化完成
-    std::thread::sleep(std::time::Duration::from_millis(200));
-
-    // 然后初始化WiFi系统
-    let sys_loop = EspSystemEventLoop::take()?;
-    let nvs = EspDefaultNvsPartition::take()?;
-    println!("正在初始化WiFi...");
-    let mut wifi_manager = WifiManager::new(p.modem, sys_loop, Some(nvs))?;
-
-    let wifi_config = WifiConfig::new("fushangyun", "fsy@666888");
-
-    println!("尝试连接WiFi: {}", wifi_config.ssid);
-    match wifi_manager.connect_with_config(&wifi_config) {
-        Ok(_) => {
-            println!("WiFi连接成功!");
-            if let Ok(ip) = wifi_manager.get_ip_info() {
-                println!("IP地址: {:?}", ip);
-            }
-        }
-        Err(e) => {
-            println!("WiFi连接失败: {:?}", e);
-        }
-    }
-
-    // mic gpio
-    let i2s = p.i2s0;
-    let ws = p.pins.gpio2;
-    let sck = p.pins.gpio15;
-    let sd = p.pins.gpio39;
+    std::thread::sleep(std::time::Duration::from_millis(3000));
 
     println!("应用启动成功，进入主循环...");
 
