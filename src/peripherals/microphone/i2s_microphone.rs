@@ -32,23 +32,11 @@ impl I2sMicrophone {
         sd_pin: Gpio39,
         sample_rate: u32,
     ) -> Result<Self> {
-        println!(
-            "配置I2S: 采样率={}Hz, 数据位宽=16bit, 模式=Mono",
-            sample_rate
-        );
-
         let std_cfg = StdConfig::new(
             Config::new().auto_clear(true),
             StdClkConfig::from_sample_rate_hz(sample_rate),
             StdSlotConfig::philips_slot_default(DataBitWidth::Bits16, SlotMode::Mono),
             StdGpioConfig::new(false, false, false),
-        );
-
-        println!(
-            "初始化I2S驱动: SCK=GPIO{}, SD=GPIO{}, WS=GPIO{}",
-            sck_pin.pin(),
-            sd_pin.pin(),
-            ws_pin.pin()
         );
 
         let driver = I2sDriver::new_std_rx(
@@ -59,8 +47,6 @@ impl I2sMicrophone {
             None::<Gpio2>, // mclk (主时钟，通常不需要)
             ws_pin,        // 字选择/帧同步
         )?;
-
-        println!("I2S驱动初始化完成");
 
         Ok(Self {
             i2s_driver: driver,
@@ -81,10 +67,8 @@ impl I2sMicrophone {
     ///
     /// 启用I2S通道并设置麦克风为录音状态
     pub fn start_recording(&mut self) -> Result<()> {
-        println!("启用I2S通道...");
         self.i2s_driver.rx_enable()?;
         self.is_recording = true;
-        println!("I2S通道已启用，开始录音");
         Ok(())
     }
 
@@ -92,10 +76,8 @@ impl I2sMicrophone {
     ///
     /// 禁用I2S通道并设置麦克风为停止录音状态
     pub fn stop_recording(&mut self) -> Result<()> {
-        println!("禁用I2S通道...");
         self.i2s_driver.rx_disable()?;
         self.is_recording = false;
-        println!("I2S通道已禁用，停止录音");
         Ok(())
     }
 
@@ -116,7 +98,7 @@ impl I2sMicrophone {
     /// 成功返回Ok，如果正在录音则返回错误
     pub fn set_sample_rate(&mut self, sample_rate: u32) -> Result<()> {
         if self.is_recording() {
-            return Err(anyhow::anyhow!("无法在录音时更改采样率"));
+            anyhow::bail!("无法在录音时更改采样率");
         }
         self.sample_rate = sample_rate;
         Ok(())
@@ -131,7 +113,7 @@ impl I2sMicrophone {
     /// 返回实际读取的样本数或错误
     pub fn read_samples(&mut self, buffer: &mut [i16]) -> Result<usize> {
         if !self.is_recording() {
-            return Err(anyhow::anyhow!("麦克风未在录音状态"));
+            anyhow::bail!("麦克风未在录音状态");
         }
 
         // 将i16缓冲区转换为u8缓冲区进行I2S读取
@@ -177,33 +159,10 @@ impl I2sMicrophone {
         let mut audio_buffer = AudioBuffer::new(buffer_size);
         let mut total_samples = 0;
 
-        log::info!(
-            "开始录制{}秒音频，目标样本数: {}",
-            duration_seconds,
-            target_samples
-        );
-
         while total_samples < target_samples {
             let samples_written = self.read_to_buffer(&mut audio_buffer, chunk_size)?;
             total_samples += samples_written;
-
-            // 每秒打印一次进度
-            if total_samples % self.sample_rate as usize == 0 {
-                let seconds = total_samples / self.sample_rate as usize;
-                log::info!(
-                    "已录制: {}秒 ({}/{}样本)",
-                    seconds,
-                    total_samples,
-                    target_samples
-                );
-            }
         }
-
-        log::info!(
-            "录音完成! 总共录制了 {} 个样本 ({:.1}秒)",
-            total_samples,
-            total_samples as f32 / self.sample_rate as f32
-        );
 
         Ok(audio_buffer)
     }
