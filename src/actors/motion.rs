@@ -11,13 +11,13 @@ use crate::peripherals::qmi8658::{
     QMI8658_ADDRESS_HIGH,
 };
 
-pub struct MotionActor {
-    qmi8658: Box<QMI8658Driver<'static>>,
+pub struct MotionActor<'a> {
+    qmi8658: QMI8658Driver<'a>,
     motion_detector: MotionDetector,
     app_event_sender: crate::events::EventSender,
 }
 
-impl MotionActor {
+impl<'a> MotionActor<'a> {
     pub fn new(
         i2c: I2C0,
         sda: Gpio11,
@@ -25,12 +25,10 @@ impl MotionActor {
         app_event_sender: crate::events::EventSender,
     ) -> Result<Self> {
         let qmi8658 = QMI8658Driver::new(i2c, sda, scl, QMI8658_ADDRESS_HIGH)?;
-        let qmi8658_boxed: Box<QMI8658Driver<'static>> =
-            unsafe { std::mem::transmute(Box::new(qmi8658)) };
         let motion_detector = MotionDetector::new();
 
         Ok(Self {
-            qmi8658: qmi8658_boxed,
+            qmi8658,
             motion_detector,
             app_event_sender,
         })
@@ -74,19 +72,15 @@ impl MotionActorManager {
         scl: Gpio10,
         app_event_sender: crate::events::EventSender,
     ) -> Result<Self> {
+        // 先在当前线程创建actor，这样生命周期明确
+        let mut actor = MotionActor::new(i2c, sda, scl, app_event_sender)?;
+
         thread::Builder::new()
             .stack_size(32 * 1024)
             .name("motion_actor".to_string())
-            .spawn(
-                move || match MotionActor::new(i2c, sda, scl, app_event_sender) {
-                    Ok(mut actor) => {
-                        actor.run();
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to create motion actor: {}", e);
-                    }
-                },
-            )
+            .spawn(move || {
+                actor.run();
+            })
             .expect("Failed to spawn motion actor thread");
 
         Ok(Self {})
