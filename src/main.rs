@@ -72,10 +72,16 @@ fn main() -> Result<()> {
     println!("应用启动成功，进入主循环...");
 
     loop {
+        // 处理事件
         while let Ok(event) = event_bus.try_recv() {
             if let Err(e) = app.handle_event(event) {
                 eprintln!("处理事件失败: {}", e);
             }
+        }
+
+        // 定期更新显示（这样timer能正确递增）
+        if let Err(e) = app.update() {
+            eprintln!("显示更新失败: {}", e);
         }
 
         FreeRtos::delay_ms(50);

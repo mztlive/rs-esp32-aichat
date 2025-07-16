@@ -82,6 +82,7 @@ impl<'a> Display<'a> {
 
     /// 处理用户输入
     pub fn back(&mut self) -> Result<()> {
+        println!("[DEBUG] back() 被调用，当前状态: {:?}", self.state);
         match &self.state {
             // 欢迎界面：任意按键进入主界面
             DisplayState::Welcome => {
@@ -90,9 +91,7 @@ impl<'a> Display<'a> {
 
             // 晃动状态：返回键回到主界面
             DisplayState::Dizziness => {
-                if self.can_exit_dizziness() {
-                    self.exit_diszziness()?;
-                }
+                self.exit_diszziness()?;
             }
 
             // 设备倾斜
@@ -205,7 +204,9 @@ impl<'a> Display<'a> {
             MotionState::Still => {
                 self.back()?;
             }
-            MotionState::Tilting => self.enter_tilting()?,
+            MotionState::Tilting => {
+                self.enter_tilting()?;
+            }
         }
 
         Ok(())
