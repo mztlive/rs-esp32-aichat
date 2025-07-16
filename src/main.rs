@@ -12,13 +12,11 @@ mod graphics;
 mod peripherals;
 
 use crate::{
-    actors::wifi::WifiActorManager,
+    actors::{motion::MotionActorManager, wifi::WifiActorManager},
     display::Display,
-    events::{send_motion_event, AppEvent, EventBus, EventHandler},
+    events::{AppEvent, EventBus, EventHandler},
     graphics::primitives::GraphicsPrimitives,
-    peripherals::{
-        qmi8658::motion_detector::MotionDetector, st77916::lcd::LcdController, wifi::WifiConfig,
-    },
+    peripherals::{st77916::lcd::LcdController, wifi::WifiConfig},
 };
 
 fn main() -> Result<()> {
@@ -34,21 +32,14 @@ fn main() -> Result<()> {
     let sda = p.pins.gpio11;
     let scl = p.pins.gpio10;
     let i2c = p.i2c0;
-    // 初始化 QMI8658 传感器
-    println!("正在初始化QMI8658传感器...");
-    let mut qmi8658 = peripherals::qmi8658::QMI8658::new(
-        i2c,
-        sda,
-        scl,
-        peripherals::qmi8658::QMI8658_ADDRESS_HIGH,
-    )?;
-
-    // 初始化运动检测器
-    let mut motion_detector = MotionDetector::new();
 
     // 创建事件总线
     let mut event_bus = EventBus::new();
     let event_sender = event_bus.get_sender();
+
+    // 初始化运动检测actor（自动启动后台线程）
+    println!("正在初始化运动检测器...");
+    let _motion_actor = MotionActorManager::new(i2c, sda, scl, event_sender.clone())?;
 
     // 然后初始化WiFi系统
     let sys_loop = EspSystemEventLoop::take()?;
@@ -77,15 +68,6 @@ fn main() -> Result<()> {
     println!("应用启动成功，进入主循环...");
 
     loop {
-        // 读取传感器数据并检测运动
-        let sensor_data = qmi8658.read_sensor_data()?;
-        let motion_state = motion_detector.detect_motion(&sensor_data);
-
-        // 发送运动事件
-        if let Err(e) = send_motion_event(&event_sender, motion_state) {
-            eprintln!("发送运动事件失败: {}", e);
-        }
-
         // 处理所有事件
         while let Ok(event) = event_bus.try_recv() {
             if let Err(e) = display.handle_event(event) {
