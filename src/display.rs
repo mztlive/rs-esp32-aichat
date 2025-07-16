@@ -82,7 +82,6 @@ impl<'a> Display<'a> {
 
     /// 处理用户输入
     pub fn back(&mut self) -> Result<()> {
-        println!("[DEBUG] back() 被调用，当前状态: {:?}", self.state);
         match &self.state {
             // 欢迎界面：任意按键进入主界面
             DisplayState::Welcome => {
@@ -113,7 +112,6 @@ impl<'a> Display<'a> {
             return Ok(());
         }
 
-        println!("状态转换: {:?} -> {:?}", self.state, new_state);
         self.state = new_state;
         self.state_timer = 0; // 重置计时器
 
@@ -217,7 +215,6 @@ impl<'a> Display<'a> {
     /// 使用wrapping_sub()处理时间戳溢出情况
     pub fn can_exit_dizziness(&self) -> bool {
         if self.state != DisplayState::Dizziness {
-            println!("[DEBUG] 不在Dizziness状态，当前状态: {:?}", self.state);
             return false;
         }
 
@@ -227,10 +224,6 @@ impl<'a> Display<'a> {
         let elapsed_time = current_time.wrapping_sub(self.dizziness_start_time);
         let can_exit = elapsed_time >= MIN_DIZZINESS_DURATION_US;
 
-        println!(
-            "[DEBUG] can_exit_dizziness: elapsed={}μs, min={}μs, can_exit={}",
-            elapsed_time, MIN_DIZZINESS_DURATION_US, can_exit
-        );
         can_exit
     }
 

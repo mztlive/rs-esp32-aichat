@@ -166,13 +166,9 @@ impl<'a> QMI8658Driver<'a> {
             timestamp: 0,
         };
 
-        println!("Scanning I2C bus for devices...");
         for addr in 0x08..=0x77 {
-            let result = driver.i2c.write(addr, &[0x00], 100);
-            match result {
-                Ok(_) => println!("Found device at address 0x{:02X}", addr),
-                Err(_) => {}
-            }
+            // todo: 这里可能会有问题
+            let _ = driver.i2c.write(addr, &[0x00], 100);
         }
 
         driver.init()?;
@@ -181,7 +177,6 @@ impl<'a> QMI8658Driver<'a> {
 
     fn init(&mut self) -> Result<()> {
         let who_am_i = self.get_who_am_i()?;
-        println!("QMI8658 WHO_AM_I: 0x{:02X}", who_am_i);
         if who_am_i != 0x05 {
             error!("Invalid WHO_AM_I value: 0x{:02X}, expected 0x05", who_am_i);
             return Err(anyhow::anyhow!("Invalid WHO_AM_I"));
@@ -213,16 +208,9 @@ impl<'a> QMI8658Driver<'a> {
 
     pub fn get_who_am_i(&mut self) -> Result<u8> {
         let mut buffer = [0u8; 1];
-        println!("Reading WHO_AM_I from address 0x{:02X}...", self.address);
         match self.read_register(QMI8658Register::WhoAmI, &mut buffer) {
-            Ok(_) => {
-                println!("WHO_AM_I read successfully: 0x{:02X}", buffer[0]);
-                Ok(buffer[0])
-            }
-            Err(e) => {
-                println!("Failed to read WHO_AM_I: {:?}", e);
-                Err(e)
-            }
+            Ok(_) => Ok(buffer[0]),
+            Err(e) => Err(e),
         }
     }
 
