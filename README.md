@@ -7,7 +7,10 @@
 - 🎯 **360x360圆形显示屏** - ST77916驱动芯片，支持高清彩色显示
 - 🎮 **运动交互** - QMI8658六轴传感器，支持摇晃和倾斜检测
 - 🎨 **完整图形系统** - 九宫格布局、动画播放、多种绘图原语
-- ⚡ **Actor模式架构** - 多线程设计，传感器和显示分离处理
+- ⚡ **事件驱动架构** - 基于事件总线的actor模式，支持WiFi、API通信
+- 🌐 **WiFi连接** - 支持无线网络连接和配置管理
+- 🤖 **API集成** - 完整的HTTP客户端，支持流式响应和聊天功能
+- 🎤 **音频支持** - I2S麦克风接口，支持语音输入
 - 🚀 **高性能渲染** - QSPI接口80MHz高速传输，DMA硬件加速
 
 ## 快速开始
@@ -17,6 +20,7 @@
 - Rust工具链（esp版本）
 - ESP-IDF框架
 - web-flash工具
+- WiFi网络（用于API通信）
 
 ### 构建项目
 
@@ -55,6 +59,12 @@
 - **接口**: I2C通信
 - **特性**: 运动检测、摇晃识别、倾斜感应
 
+### 音频模块
+- **麦克风**: I2S数字麦克风
+- **采样率**: 可配置采样率
+- **接口**: I2S通信协议
+- **用途**: 语音输入和命令识别
+
 ### 引脚配置
 ```
 LCD显示屏:
@@ -70,6 +80,11 @@ LCD显示屏:
 运动传感器:
 ├── I2C_SDA   -> GPIO11  (数据线)
 └── I2C_SCL   -> GPIO10  (时钟线)
+
+音频模块:
+├── I2S_SCK   -> [配置GPIO]  (时钟)
+├── I2S_WS    -> [配置GPIO]  (字选择)
+└── I2S_SD    -> [配置GPIO]  (数据)
 ```
 
 ## 软件架构
@@ -79,29 +94,44 @@ LCD显示屏:
 ```
 src/
 ├── main.rs              # 主程序入口
-├── app.rs               # 应用状态机
+├── app.rs               # 应用事件处理器
+├── display.rs           # 显示状态机
+├── events.rs            # 事件总线系统
 ├── actors/
-│   └── display.rs       # 显示Actor线程
+│   ├── motion.rs        # 运动检测Actor
+│   └── wifi.rs          # WiFi管理Actor
+├── api/
+│   ├── client.rs        # HTTP客户端
+│   └── types.rs         # API类型定义
 ├── peripherals/
 │   ├── st77916/         # LCD驱动
-│   └── qmi8658/         # 运动传感器
+│   ├── qmi8658/         # 运动传感器
+│   ├── microphone/      # I2S麦克风
+│   └── wifi/            # WiFi管理
 └── graphics/
     ├── primitives.rs    # 绘图原语
     ├── layout.rs        # 布局系统
     ├── screens/         # 界面屏幕
-    └── animation.rs     # 动画播放
+    └── ui/              # UI组件
 ```
 
-### Actor模式设计
+### 事件驱动架构
 
 ```mermaid
 graph TD
-    A[主线程] --> B[传感器循环]
-    B --> C[运动检测]
-    C --> D[发送事件]
-    D --> E[Display Actor]
-    E --> F[状态更新]
-    F --> G[界面渲染]
+    A[主线程] --> B[事件循环]
+    B --> C[事件总线]
+    C --> D[运动Actor]
+    C --> E[WiFi Actor]
+    C --> F[显示状态机]
+    D --> G[运动事件]
+    E --> H[WiFi事件]
+    F --> I[UI渲染]
+    G --> C
+    H --> C
+    J[API客户端] --> K[HTTP请求]
+    K --> L[流式响应]
+    L --> C
 ```
 
 ### 应用状态
@@ -113,6 +143,13 @@ graph TD
 - **摇晃状态** (`Dizziness`) - 设备被摇晃时的特效
 - **倾斜状态** (`Tilting`) - 设备倾斜时的显示
 - **错误状态** (`Error`) - 错误信息显示
+
+### 事件类型
+
+- **运动事件** (`MotionEvent`) - 传感器状态变化
+- **WiFi事件** (`WifiEvent`) - 网络连接状态
+- **系统事件** (`SystemEvent`) - 系统级别事件
+- **API事件** - HTTP请求和响应处理
 
 ## 图形系统
 
@@ -165,21 +202,63 @@ primitives.fill_screen(WHITE)?;
 - **摇晃状态** (`Shaking`) - 检测到剧烈摇晃
 - **倾斜状态** (`Tilting`) - 设备倾斜超过阈值
 
-### 交互逻辑
+### 事件处理
 
 ```rust
-match motion_state {
-    MotionState::Shaking => {
-        // 进入摇晃特效界面
-        app.enter_dizziness()
-    },
-    MotionState::Still => {
-        // 返回主界面
-        app.back()
-    },
-    MotionState::Tilting => {
-        // 显示倾斜状态
-        app.enter_tilting()
+match event {
+    AppEvent::Motion(motion_event) => {
+        match motion_event {
+            MotionEvent::Shaking => {
+                // 发送摇晃事件到显示状态机
+                display.handle_motion_event(motion_event)
+            },
+            MotionEvent::Still => {
+                // 返回主界面
+                display.transition_to_main()
+            },
+            MotionEvent::Tilting => {
+                // 显示倾斜状态
+                display.enter_tilting_state()
+            }
+        }
+    }
+}
+```
+
+## WiFi与API集成
+
+### WiFi管理
+
+```rust
+// WiFi连接配置
+let wifi_config = WifiConfig {
+    ssid: "your-network",
+    password: "your-password",
+    auth_method: AuthMethod::WPA2Personal,
+};
+
+// 连接WiFi
+wifi_actor.connect(wifi_config).await?;
+```
+
+### API客户端
+
+```rust
+// HTTP API调用
+let client = ApiClient::new();
+let response = client.send_chat_message("Hello AI!").await?;
+
+// 处理流式响应
+for event in response.events() {
+    match event {
+        SseEvent::Data(data) => {
+            // 处理接收到的数据
+            display.update_chat_content(data);
+        }
+        SseEvent::Done => {
+            // 响应完成
+            display.set_thinking_complete();
+        }
     }
 }
 ```
@@ -189,8 +268,10 @@ match motion_state {
 - **内存优化**: 分块传输减少内存占用
 - **显示优化**: QSPI 80MHz高速传输
 - **硬件加速**: DMA批量像素传输
-- **线程分离**: Actor模式避免阻塞
+- **事件驱动**: 异步事件处理避免阻塞
 - **资源嵌入**: 编译时资源打包
+- **网络优化**: 异步HTTP客户端和连接池
+- **数据流**: 流式API响应处理
 
 ## 开发工具
 
@@ -252,6 +333,18 @@ rustc --version
 - 检查I2C引脚连接
 - 验证传感器地址配置
 - 确认传感器电源供应
+
+**WiFi连接失败**
+- 检查网络配置文件
+- 确认WiFi凭据正确
+- 验证网络信号强度
+- 检查路由器设置
+
+**API调用失败**
+- 检查网络连接状态
+- 验证API端点配置
+- 确认请求格式正确
+- 检查超时设置
 
 ## 贡献指南
 

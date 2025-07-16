@@ -146,13 +146,13 @@ impl<'a> Display<'a> {
     }
 
     /// 进入摇晃状态
-    /// 
+    ///
     /// 当检测到设备摇晃时调用，显示眩晕效果界面。
     /// 记录进入时间以控制最小持续时间。
-    /// 
+    ///
     /// # 返回值
     /// * `Result<()>` - 状态切换结果
-    /// 
+    ///
     /// # 特殊逻辑
     /// - 如果已经在摇晃状态，直接返回
     /// - 记录进入摇晃状态的精确时间戳（微秒级）
@@ -169,12 +169,12 @@ impl<'a> Display<'a> {
     }
 
     /// 进入倾斜状态
-    /// 
+    ///
     /// 当检测到设备倾斜时调用，显示倾斜状态界面。
-    /// 
+    ///
     /// # 返回值
     /// * `Result<()>` - 状态切换结果
-    /// 
+    ///
     /// # 特殊逻辑
     /// 如果当前已经在摇晃状态，优先保持摇晃状态（摇晃优先级更高）
     pub fn enter_tilting(&mut self) -> Result<()> {
@@ -186,15 +186,15 @@ impl<'a> Display<'a> {
     }
 
     /// 进入错误状态
-    /// 
+    ///
     /// 当发生错误时调用，显示错误信息界面。
-    /// 
+    ///
     /// # 参数
     /// * `error_msg` - 错误消息字符串，将显示在错误界面上
-    /// 
+    ///
     /// # 返回值
     /// * `Result<()>` - 状态切换结果
-    /// 
+    ///
     /// # 注意
     /// 错误状态会在3秒后自动返回欢迎界面（在update()方法中处理）
     pub fn enter_error(&mut self, error_msg: String) -> Result<()> {
@@ -202,17 +202,17 @@ impl<'a> Display<'a> {
     }
 
     /// 检查是否可以退出摇晃状态
-    /// 
+    ///
     /// 确保摇晃状态至少持续3秒，避免过于频繁的状态切换。
-    /// 
+    ///
     /// # 返回值
     /// * `bool` - true表示可以退出，false表示需要继续保持摇晃状态
-    /// 
+    ///
     /// # 检查逻辑
     /// 1. 确认当前确实在摇晃状态
     /// 2. 计算已经持续的时间
     /// 3. 判断是否达到最小持续时间（3秒）
-    /// 
+    ///
     /// # 时间处理
     /// 使用wrapping_sub()处理时间戳溢出情况
     pub fn can_exit_dizziness(&self) -> bool {
@@ -227,23 +227,25 @@ impl<'a> Display<'a> {
         let elapsed_time = current_time.wrapping_sub(self.dizziness_start_time);
         let can_exit = elapsed_time >= MIN_DIZZINESS_DURATION_US;
 
-        println!("[DEBUG] can_exit_dizziness: elapsed={}μs, min={}μs, can_exit={}", 
-                elapsed_time, MIN_DIZZINESS_DURATION_US, can_exit);
+        println!(
+            "[DEBUG] can_exit_dizziness: elapsed={}μs, min={}μs, can_exit={}",
+            elapsed_time, MIN_DIZZINESS_DURATION_US, can_exit
+        );
         can_exit
     }
 
     /// 尝试退出摇晃状态
-    /// 
+    ///
     /// 检查是否满足退出条件（最小持续时间），如果满足则返回主界面。
-    /// 
+    ///
     /// # 返回值
     /// * `Result<()>` - 操作结果，状态切换失败时返回Err
-    /// 
+    ///
     /// # 退出逻辑
     /// - 调用can_exit_dizziness()检查是否可以退出
     /// - 如果可以退出，切换到主界面
     /// - 如果不能退出，保持当前状态并记录日志
-    /// 
+    ///
     /// # 注意
     /// 方法名中的拼写错误(diszziness)保持原样以避免破坏现有调用
     pub fn exit_diszziness(&mut self) -> Result<()> {
@@ -258,20 +260,20 @@ impl<'a> Display<'a> {
     }
 
     /// 处理运动传感器事件
-    /// 
+    ///
     /// 根据检测到的运动状态触发相应的显示状态切换。
-    /// 
+    ///
     /// # 参数
     /// * `state` - 运动传感器检测到的运动状态
-    /// 
+    ///
     /// # 返回值
     /// * `Result<()>` - 操作结果，状态切换失败时返回Err
-    /// 
+    ///
     /// # 运动状态处理
     /// - Shaking: 进入摇晃状态，显示眩晕效果
     /// - Still: 设备静止，触发返回操作
     /// - Tilting: 进入倾斜状态，显示倾斜界面
-    /// 
+    ///
     /// # 注意
     /// 这是传感器事件与UI状态之间的桥梁方法
     pub fn on_motion(&mut self, state: MotionState) -> Result<()> {
