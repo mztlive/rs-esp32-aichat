@@ -6,6 +6,7 @@ use esp_idf_sys::{heap_caps_get_free_size, heap_caps_get_largest_free_block, MAL
 
 mod actors;
 mod api;
+mod app;
 mod display;
 mod events;
 mod graphics;
@@ -13,6 +14,7 @@ mod peripherals;
 
 use crate::{
     actors::{motion::MotionActorManager, wifi::WifiActorManager},
+    app::App,
     display::Display,
     events::{AppEvent, EventBus, EventHandler},
     graphics::primitives::GraphicsPrimitives,
@@ -65,18 +67,17 @@ fn main() -> Result<()> {
     let graphics = GraphicsPrimitives::new(&mut lcd);
     let mut display = Display::new(graphics);
 
+    let mut app = App::new(display);
+
     println!("应用启动成功，进入主循环...");
 
     loop {
         // 处理所有事件
         while let Ok(event) = event_bus.try_recv() {
-            if let Err(e) = display.handle_event(event) {
+            if let Err(e) = app.handle_event(event) {
                 eprintln!("处理事件失败: {}", e);
             }
         }
-
-        // 更新显示
-        display.update().unwrap();
 
         FreeRtos::delay_ms(50);
     }

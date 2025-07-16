@@ -1,7 +1,6 @@
 use anyhow::Result;
 
 use crate::{
-    events::{AppEvent, EventHandler, UserInputEvent},
     graphics::{
         colors::BLACK,
         primitives::GraphicsPrimitives,
@@ -31,21 +30,6 @@ pub enum DisplayState {
 
     /// 错误界面
     Error(String),
-}
-
-/// 用户输入事件
-#[derive(Debug, Clone)]
-pub enum UserInput {
-    /// 按键按下
-    ButtonPress,
-    /// 确认操作
-    Confirm,
-    /// 取消操作
-    Cancel,
-    /// 进入设置
-    Settings,
-    /// 返回主界面
-    Back,
 }
 
 /// 主应用结构
@@ -224,96 +208,6 @@ impl<'a> Display<'a> {
             MotionState::Tilting => self.enter_tilting()?,
         }
 
-        Ok(())
-    }
-}
-
-impl<'a> EventHandler for Display<'a> {
-    fn handle_event(&mut self, event: AppEvent) -> Result<()> {
-        match event {
-            AppEvent::Motion(motion_state) => {
-                self.on_motion(motion_state)?;
-            }
-            AppEvent::UserInput(user_input) => {
-                match user_input {
-                    UserInputEvent::ButtonPress => {
-                        self.back()?;
-                    }
-                    UserInputEvent::Confirm => {
-                        self.back()?;
-                    }
-                    UserInputEvent::Cancel => {
-                        self.back()?;
-                    }
-                    UserInputEvent::Settings => {
-                        self.enter_settings()?;
-                    }
-                    UserInputEvent::Back => {
-                        self.back()?;
-                    }
-                }
-            }
-            AppEvent::Timer(timer_event) => {
-                match timer_event {
-                    crate::events::TimerEvent::MainLoop => {
-                        // 主循环定时器，可能需要更新动画等
-                    }
-                    crate::events::TimerEvent::StateTimeout => {
-                        // 状态超时处理
-                        match self.state {
-                            DisplayState::Error(_) => {
-                                self.enter_welcome()?;
-                            }
-                            DisplayState::Dizziness => {
-                                if self.can_exit_dizziness() {
-                                    self.exit_diszziness()?;
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    crate::events::TimerEvent::AnimationFrame => {
-                        // 动画帧更新
-                    }
-                }
-            }
-            AppEvent::System(system_event) => {
-                match system_event {
-                    crate::events::SystemEvent::LowBattery => {
-                        self.enter_error("电量不足".to_string())?;
-                    }
-                    crate::events::SystemEvent::LowMemory => {
-                        self.enter_error("内存不足".to_string())?;
-                    }
-                    crate::events::SystemEvent::HardwareError(error) => {
-                        self.enter_error(format!("硬件错误: {}", error))?;
-                    }
-                    crate::events::SystemEvent::Shutdown => {
-                        println!("系统即将关闭");
-                    }
-                }
-            }
-            AppEvent::Wifi(wifi_event) => {
-                match wifi_event {
-                    crate::actors::wifi::WifiEvent::Connected(ip) => {
-                        println!("WiFi连接成功! IP: {}", ip);
-                    }
-                    crate::actors::wifi::WifiEvent::Disconnected => {
-                        println!("WiFi连接断开");
-                    }
-                    crate::actors::wifi::WifiEvent::ConnectionFailed(error) => {
-                        println!("WiFi连接失败: {}", error);
-                        self.enter_error(format!("WiFi连接失败: {}", error))?;
-                    }
-                    crate::actors::wifi::WifiEvent::StatusUpdate(status) => {
-                        println!("WiFi状态更新: {:?}", status);
-                    }
-                    crate::actors::wifi::WifiEvent::ScanResult(networks) => {
-                        println!("扫描到的网络: {:?}", networks);
-                    }
-                }
-            }
-        }
         Ok(())
     }
 }

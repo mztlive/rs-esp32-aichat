@@ -75,13 +75,9 @@ impl MotionActorManager {
         // 先在当前线程创建actor，这样生命周期明确
         let mut actor = MotionActor::new(i2c, sda, scl, app_event_sender)?;
 
-        thread::Builder::new()
-            .stack_size(32 * 1024)
-            .name("motion_actor".to_string())
-            .spawn(move || {
-                actor.run();
-            })
-            .expect("Failed to spawn motion actor thread");
+        thread::spawn(move || {
+            actor.run();
+        });
 
         Ok(Self {})
     }

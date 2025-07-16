@@ -1,53 +1,18 @@
 // src/events.rs
+use crate::{actors::wifi::WifiEvent, peripherals::qmi8658::motion_detector::MotionState};
 use std::sync::mpsc;
-use crate::{
-    actors::wifi::WifiEvent,
-    peripherals::qmi8658::motion_detector::MotionState,
-};
 
 /// 应用事件枚举，用于统一处理来自各个子线程的消息
 #[derive(Debug, Clone)]
 pub enum AppEvent {
     /// 运动传感器事件
     Motion(MotionState),
-    
+
     /// WiFi事件
     Wifi(WifiEvent),
-    
-    /// 用户输入事件
-    UserInput(UserInputEvent),
-    
-    /// 定时器事件
-    Timer(TimerEvent),
-    
+
     /// 系统事件
     System(SystemEvent),
-}
-
-/// 用户输入事件
-#[derive(Debug, Clone)]
-pub enum UserInputEvent {
-    /// 按键按下
-    ButtonPress,
-    /// 确认操作
-    Confirm,
-    /// 取消操作
-    Cancel,
-    /// 进入设置
-    Settings,
-    /// 返回主界面
-    Back,
-}
-
-/// 定时器事件
-#[derive(Debug, Clone)]
-pub enum TimerEvent {
-    /// 主循环定时器
-    MainLoop,
-    /// 状态超时
-    StateTimeout,
-    /// 动画帧更新
-    AnimationFrame,
 }
 
 /// 系统事件
@@ -112,22 +77,23 @@ pub trait EventHandler {
 }
 
 /// 事件发送器辅助函数
-pub fn send_motion_event(sender: &EventSender, motion_state: MotionState) -> Result<(), mpsc::SendError<AppEvent>> {
+pub fn send_motion_event(
+    sender: &EventSender,
+    motion_state: MotionState,
+) -> Result<(), mpsc::SendError<AppEvent>> {
     sender.send(AppEvent::Motion(motion_state))
 }
 
-pub fn send_wifi_event(sender: &EventSender, wifi_event: WifiEvent) -> Result<(), mpsc::SendError<AppEvent>> {
+pub fn send_wifi_event(
+    sender: &EventSender,
+    wifi_event: WifiEvent,
+) -> Result<(), mpsc::SendError<AppEvent>> {
     sender.send(AppEvent::Wifi(wifi_event))
 }
 
-pub fn send_user_input_event(sender: &EventSender, user_input: UserInputEvent) -> Result<(), mpsc::SendError<AppEvent>> {
-    sender.send(AppEvent::UserInput(user_input))
-}
-
-pub fn send_timer_event(sender: &EventSender, timer_event: TimerEvent) -> Result<(), mpsc::SendError<AppEvent>> {
-    sender.send(AppEvent::Timer(timer_event))
-}
-
-pub fn send_system_event(sender: &EventSender, system_event: SystemEvent) -> Result<(), mpsc::SendError<AppEvent>> {
+pub fn send_system_event(
+    sender: &EventSender,
+    system_event: SystemEvent,
+) -> Result<(), mpsc::SendError<AppEvent>> {
     sender.send(AppEvent::System(system_event))
 }
