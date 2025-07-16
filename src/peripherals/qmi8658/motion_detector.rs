@@ -14,10 +14,10 @@ pub enum MotionState {
 pub struct MotionConfig;
 
 impl MotionConfig {
-    /// 连续检测到晃动的最小次数（避免噪声干扰）
-    pub const SHAKE_COUNT_THRESHOLD: u32 = 12;
-    /// 连续稳定状态的次数阈值（重置晃动计数）
-    pub const STABLE_COUNT_THRESHOLD: u32 = 10;
+    /// 连续检测到晃动的最小次数（避免噪声干扰）- 适配500ms轮询
+    pub const SHAKE_COUNT_THRESHOLD: u32 = 2;
+    /// 连续稳定状态的次数阈值（重置晃动计数）- 适配500ms轮询
+    pub const STABLE_COUNT_THRESHOLD: u32 = 2;
     /// 默认加速度变化阈值 (mg) - 大幅摇动检测
     pub const DEFAULT_ACCEL_THRESHOLD: f32 = 800.0;
     /// 默认陀螺仪阈值 (°/s) - 大幅摇动检测
