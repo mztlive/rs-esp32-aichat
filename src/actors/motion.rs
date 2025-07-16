@@ -8,6 +8,8 @@ use esp_idf_hal::i2c::I2C0;
 use esp_idf_svc::timer::EspTimer;
 use esp_idf_sys::esp_timer_get_time;
 
+const HEARTBEAT_INTERVAL_US: i64 = 5_000_000;
+
 use crate::peripherals::qmi8658::{
     driver::{QMI8658Driver, SensorData},
     motion_detector::{MotionDetector, MotionState},
@@ -19,6 +21,7 @@ pub struct MotionActor<'a> {
     motion_detector: MotionDetector,
     app_event_sender: crate::events::EventSender,
     last_state: Option<MotionState>,
+    last_sent_time: i64,
 }
 
 impl<'a> MotionActor<'a> {
@@ -36,6 +39,7 @@ impl<'a> MotionActor<'a> {
             motion_detector,
             app_event_sender,
             last_state: None,
+            last_sent_time: 0,
         })
     }
 
@@ -49,11 +53,13 @@ impl<'a> MotionActor<'a> {
                     let motion_state = self.motion_detector.detect_motion(&sensor_data);
 
                     let time = unsafe { esp_timer_get_time() };
-                    println!("读取到运动状态: {:?}, time: {}", motion_state, time);
 
-                    // 如果最后一次的状态和当前状态不一致，发送事件
-                    if self.last_state != Some(motion_state) {
+                    let should_send = self.last_state != Some(motion_state)
+                        || (time - self.last_sent_time) >= HEARTBEAT_INTERVAL_US;
+
+                    if should_send {
                         self.last_state = Some(motion_state);
+                        self.last_sent_time = time;
 
                         // 发送运动事件到主事件总线
                         if let Err(e) =

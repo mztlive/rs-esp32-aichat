@@ -79,7 +79,7 @@ fn main() -> Result<()> {
             }
         }
 
-        // 定期更新显示（这样timer能正确递增）
+        // 定期更新显示（用于动画和UI刷新，但时间计算不再依赖此频率）
         if let Err(e) = app.update() {
             eprintln!("显示更新失败: {}", e);
         }

@@ -151,11 +151,9 @@ impl<'a> Display<'a> {
             return Ok(()); // 已经在晃动状态，直接返回
         }
 
-        // 记录进入晃动状态的全局时间，而不是相对于状态转换的时间
-        self.dizziness_start_time = self.state_timer;
+        // 记录进入晃动状态的绝对时间戳（微秒）
+        self.dizziness_start_time = unsafe { esp_idf_sys::esp_timer_get_time() } as u32;
         self.transition_to(DisplayState::Dizziness)?;
-        // 重新设置开始时间，因为transition_to会重置state_timer
-        self.dizziness_start_time = 0;
         Ok(())
     }
 
@@ -174,14 +172,18 @@ impl<'a> Display<'a> {
     /// 检查是否可以退出晃动状态
     pub fn can_exit_dizziness(&self) -> bool {
         if self.state != DisplayState::Dizziness {
+            println!("[DEBUG] 不在Dizziness状态，当前状态: {:?}", self.state);
             return false;
         }
 
-        // 晃动状态至少持续3秒（20fps * 60 = 1200帧 = 1分钟，所以60帧 = 3秒）
-        const MIN_DIZZINESS_DURATION: u32 = 60;
-        // 由于transition_to会重置state_timer，我们直接使用state_timer作为持续时间
-        let can_exit = self.state_timer >= MIN_DIZZINESS_DURATION;
+        // 晃动状态至少持续3秒（3,000,000微秒）
+        const MIN_DIZZINESS_DURATION_US: u32 = 3_000_000;
+        let current_time = unsafe { esp_idf_sys::esp_timer_get_time() } as u32;
+        let elapsed_time = current_time.wrapping_sub(self.dizziness_start_time);
+        let can_exit = elapsed_time >= MIN_DIZZINESS_DURATION_US;
 
+        println!("[DEBUG] can_exit_dizziness: elapsed={}μs, min={}μs, can_exit={}", 
+                elapsed_time, MIN_DIZZINESS_DURATION_US, can_exit);
         can_exit
     }
 
