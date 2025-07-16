@@ -65,14 +65,13 @@ fn main() -> Result<()> {
     // let app = DisplayActorManager::new(bl_io);
     let mut lcd = LcdController::new(bl_io).unwrap();
     let graphics = GraphicsPrimitives::new(&mut lcd);
-    let mut display = Display::new(graphics);
+    let display = Display::new(graphics);
 
     let mut app = App::new(display);
 
     println!("应用启动成功，进入主循环...");
 
     loop {
-        // 处理所有事件
         while let Ok(event) = event_bus.try_recv() {
             if let Err(e) = app.handle_event(event) {
                 eprintln!("处理事件失败: {}", e);

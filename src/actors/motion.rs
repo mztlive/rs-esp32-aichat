@@ -2,8 +2,11 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::Result;
+use esp_idf_hal::delay::FreeRtos;
 use esp_idf_hal::gpio::{Gpio10, Gpio11};
 use esp_idf_hal::i2c::I2C0;
+use esp_idf_svc::timer::EspTimer;
+use esp_idf_sys::esp_timer_get_time;
 
 use crate::peripherals::qmi8658::{
     driver::{QMI8658Driver, SensorData},
@@ -15,6 +18,7 @@ pub struct MotionActor<'a> {
     qmi8658: QMI8658Driver<'a>,
     motion_detector: MotionDetector,
     app_event_sender: crate::events::EventSender,
+    last_state: Option<MotionState>,
 }
 
 impl<'a> MotionActor<'a> {
@@ -31,6 +35,7 @@ impl<'a> MotionActor<'a> {
             qmi8658,
             motion_detector,
             app_event_sender,
+            last_state: None,
         })
     }
 
@@ -43,11 +48,19 @@ impl<'a> MotionActor<'a> {
                 Ok(sensor_data) => {
                     let motion_state = self.motion_detector.detect_motion(&sensor_data);
 
-                    // 发送运动事件到主事件总线
-                    if let Err(e) =
-                        crate::events::send_motion_event(&self.app_event_sender, motion_state)
-                    {
-                        eprintln!("Failed to send motion event: {}", e);
+                    let time = unsafe { esp_timer_get_time() };
+                    println!("读取到运动状态: {:?}, time: {}", motion_state, time);
+
+                    // 如果最后一次的状态和当前状态不一致，发送事件
+                    if self.last_state != Some(motion_state) {
+                        self.last_state = Some(motion_state);
+
+                        // 发送运动事件到主事件总线
+                        if let Err(e) =
+                            crate::events::send_motion_event(&self.app_event_sender, motion_state)
+                        {
+                            eprintln!("Failed to send motion event: {}", e);
+                        }
                     }
                 }
                 Err(e) => {
@@ -55,8 +68,7 @@ impl<'a> MotionActor<'a> {
                 }
             }
 
-            // 50ms间隔，约20Hz采样率
-            std::thread::sleep(Duration::from_millis(50));
+            FreeRtos::delay_ms(500);
         }
     }
 }

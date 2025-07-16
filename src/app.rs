@@ -1,3 +1,5 @@
+use std::time;
+
 use crate::{
     actors::wifi::WifiEvent,
     display::Display,
@@ -17,6 +19,8 @@ impl<'a> App<'a> {
     }
 
     fn handle_motion(&mut self, motion_state: MotionState) -> Result<()> {
+        let time = unsafe { esp_idf_sys::esp_timer_get_time() };
+        println!("收到晃动事件: {:?}, time: {}", motion_state, time);
         self.display.on_motion(motion_state)?;
         self.display.update()?;
         Ok(())
