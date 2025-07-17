@@ -1,4 +1,3 @@
-
 use crate::{
     actors::wifi::WifiEvent,
     display::Display,

@@ -1,7 +1,5 @@
-
 pub mod client;
 pub mod types;
-
 
 #[derive(Debug, Clone)]
 pub struct ApiConfig {

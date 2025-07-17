@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WifiConfig {
@@ -22,7 +22,7 @@ impl WifiConfig {
             .map_err(|_| anyhow::anyhow!("WIFI_SSID environment variable not set"))?;
         let password = std::env::var("WIFI_PASS")
             .map_err(|_| anyhow::anyhow!("WIFI_PASS environment variable not set"))?;
-        
+
         Ok(Self::new(&ssid, &password))
     }
 
