@@ -99,7 +99,7 @@ impl ApiClient {
         let headers = self.build_headers();
         info!("-> GET {}", url);
         let request = client.request(Method::Get, url, &headers)?;
-        let mut response = request.submit()?;
+        let response = request.submit()?;
 
         let status = response.status();
         info!("<- {}", status);
@@ -118,7 +118,7 @@ impl ApiClient {
         request.write_all(body.as_bytes())?;
         request.flush()?;
 
-        let mut response = request.submit()?;
+        let response = request.submit()?;
         let status = response.status();
         info!("<- {}", status);
         let response_text = Self::read_response_body(response)?;

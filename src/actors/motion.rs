@@ -1,11 +1,9 @@
 use std::thread;
-use std::time::Duration;
 
 use anyhow::Result;
 use esp_idf_hal::delay::FreeRtos;
 use esp_idf_hal::gpio::{Gpio10, Gpio11};
 use esp_idf_hal::i2c::I2C0;
-use esp_idf_svc::timer::EspTimer;
 use esp_idf_sys::esp_timer_get_time;
 
 /// 心跳间隔时间（微秒）
@@ -15,7 +13,7 @@ use esp_idf_sys::esp_timer_get_time;
 const HEARTBEAT_INTERVAL_US: i64 = 5_000_000;
 
 use crate::peripherals::qmi8658::{
-    driver::{QMI8658Driver, SensorData},
+    driver::QMI8658Driver,
     motion_detector::{MotionDetector, MotionState},
     QMI8658_ADDRESS_HIGH,
 };

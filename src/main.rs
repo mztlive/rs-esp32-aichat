@@ -14,10 +14,9 @@ mod peripherals;
 
 use crate::{
     actors::{motion::MotionActorManager, wifi::WifiActorManager},
-    api::ApiConfig,
     app::App,
     display::Display,
-    events::{AppEvent, EventBus, EventHandler},
+    events::{EventBus, EventHandler},
     graphics::primitives::GraphicsPrimitives,
     peripherals::{st77916::lcd::LcdController, wifi::WifiConfig},
 };
@@ -37,7 +36,7 @@ fn main() -> Result<()> {
     let i2c = p.i2c0;
 
     // 创建事件总线
-    let mut event_bus = EventBus::new();
+    let event_bus = EventBus::new();
     let event_sender = event_bus.get_sender();
 
     // 初始化运动检测actor（自动启动后台线程）

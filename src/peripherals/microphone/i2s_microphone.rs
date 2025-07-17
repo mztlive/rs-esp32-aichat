@@ -1,5 +1,5 @@
 use anyhow::Result;
-use esp_idf_hal::gpio::{Gpio15, Gpio2, Gpio39, Pin};
+use esp_idf_hal::gpio::{Gpio15, Gpio2, Gpio39};
 use esp_idf_hal::i2s::{
     config::{
         Config, DataBitWidth, SlotMode, StdClkConfig, StdConfig, StdGpioConfig, StdSlotConfig,

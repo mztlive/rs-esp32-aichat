@@ -1,8 +1,6 @@
-use std::time;
 
 use crate::{
-    actors::wifi::{WifiEvent, WifiStatus},
-    api::{self, ApiConfig},
+    actors::wifi::WifiEvent,
     display::Display,
     events::{AppEvent, EventHandler, SystemEvent},
     peripherals::qmi8658::motion_detector::MotionState,

@@ -1,6 +1,5 @@
 use crate::graphics::{
-    colors::{BLACK, BLUE, GREEN, WHITE},
-    layout::ScreenRect,
+    colors::WHITE,
     primitives::GraphicsPrimitives,
 };
 
