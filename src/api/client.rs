@@ -9,15 +9,18 @@ use esp_idf_svc::http::client::EspHttpConnection;
 use log::{error, info};
 use std::time::Duration;
 
+/// HTTP API客户端，用于与聊天服务进行通信
 pub struct ApiClient {
     config: ApiConfig,
 }
 
 impl ApiClient {
+    /// 创建新的API客户端实例
     pub fn new(config: ApiConfig) -> Self {
         Self { config }
     }
 
+    /// 构建HTTP请求头
     fn build_headers(&self) -> Vec<(&str, &str)> {
         vec![
             ("X-Fingerprint", &self.config.fingerprint),
@@ -25,6 +28,7 @@ impl ApiClient {
         ]
     }
 
+    /// 创建HTTP客户端连接
     fn create_client(&self) -> Result<HttpClient<EspHttpConnection>> {
         let http_config = esp_idf_svc::http::client::Configuration {
             timeout: Some(Duration::from_secs(self.config.timeout_secs)),
@@ -35,6 +39,7 @@ impl ApiClient {
         Ok(HttpClient::wrap(connection))
     }
 
+    /// 读取HTTP响应体内容
     fn read_response_body<R>(mut reader: R) -> Result<String>
     where
         R: embedded_svc::io::Read,
@@ -52,6 +57,7 @@ impl ApiClient {
         }
     }
 
+    /// 创建API错误信息
     fn create_api_error(status: u16, response_text: &str) -> anyhow::Error {
         match serde_json::from_str::<ApiResponse<serde_json::Value>>(response_text) {
             Ok(error_response) => anyhow::anyhow!(
@@ -65,6 +71,7 @@ impl ApiClient {
         }
     }
 
+    /// 处理API响应，返回反序列化的数据
     fn handle_response<T>(&self, status: u16, response_text: &str) -> Result<T>
     where
         T: serde::de::DeserializeOwned,
@@ -77,6 +84,7 @@ impl ApiClient {
         }
     }
 
+    /// 处理无返回数据的API响应
     fn handle_response_unit(&self, status: u16, response_text: &str) -> Result<()> {
         if status == 200 {
             Ok(())
@@ -85,6 +93,7 @@ impl ApiClient {
         }
     }
 
+    /// 执行GET请求
     fn execute_get_request(&self, url: &str) -> Result<(u16, String)> {
         let mut client = self.create_client()?;
         let headers = self.build_headers();
@@ -99,6 +108,7 @@ impl ApiClient {
         Ok((status, response_text))
     }
 
+    /// 执行POST请求
     fn execute_post_request(&self, url: &str, body: &str) -> Result<(u16, String)> {
         let mut client = self.create_client()?;
         let headers = self.build_headers();
@@ -116,6 +126,13 @@ impl ApiClient {
         Ok((status, response_text))
     }
 
+    /// 创建聊天会话
+    ///
+    /// # 参数
+    /// - `model`: 可选的模型名称
+    ///
+    /// # 返回
+    /// 会话ID字符串
     pub fn create_session(&self, model: Option<&str>) -> Result<String> {
         let mut url = format!("{}/chat/create", self.config.base_url);
         if let Some(model) = model {
@@ -127,6 +144,12 @@ impl ApiClient {
         Ok(session_info.session_id)
     }
 
+    /// 发送消息到聊天会话
+    ///
+    /// # 参数
+    /// - `session_id`: 会话ID
+    /// - `message`: 消息内容
+    /// - `files`: 可选的文件列表
     pub fn send_message(
         &self,
         session_id: &str,
@@ -144,6 +167,15 @@ impl ApiClient {
         self.handle_response_unit(status, &response_text)
     }
 
+    /// 同步发送提示并获取响应
+    ///
+    /// # 参数
+    /// - `session_id`: 会话ID
+    /// - `message`: 提示消息
+    /// - `files`: 可选的文件列表
+    ///
+    /// # 返回
+    /// 聊天响应字符串
     pub fn prompt_sync(
         &self,
         session_id: &str,
