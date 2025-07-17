@@ -2,7 +2,14 @@
 use anyhow::Result;
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 use esp_idf_svc::{eventloop::EspSystemEventLoop, nvs::EspDefaultNvsPartition};
-use esp_idf_sys::{heap_caps_get_free_size, heap_caps_get_largest_free_block, MALLOC_CAP_INTERNAL};
+use esp_idf_sys::{
+    heap_caps_get_free_size, heap_caps_get_largest_free_block,
+    sr::{
+        afe_config_init, afe_mode_t_AFE_MODE_HIGH_PERF, afe_type_t_AFE_TYPE_SR,
+        esp_afe_handle_from_config, esp_srmodel_init,
+    },
+    MALLOC_CAP_INTERNAL,
+};
 
 mod actors;
 mod api;
@@ -70,6 +77,18 @@ fn main() -> Result<()> {
     let mut app = App::new(display);
 
     println!("应用启动成功，进入主循环...");
+
+    unsafe {
+        let models = esp_srmodel_init("model".as_ptr());
+        let cfg = afe_config_init(
+            "MMNR".as_ptr(),
+            models,
+            afe_type_t_AFE_TYPE_SR,
+            afe_mode_t_AFE_MODE_HIGH_PERF,
+        );
+
+        let afe_handle = esp_afe_handle_from_config(cfg);
+    }
 
     loop {
         // 处理事件

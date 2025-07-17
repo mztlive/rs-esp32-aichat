@@ -70,6 +70,12 @@ remote_component = { name = "espressif/esp_lcd_st77916", version = "1.*" }
 bindings_header = "bindings.h"
 bindings_module = "st77916"
 
+# ───── Speech Recognition ─────
+[[package.metadata.esp-idf-sys.extra_components]]
+remote_component = { name = "espressif/esp-sr", version = "2.*" } # 建议锁到主干 2.x
+bindings_header = "sr_bindings.h"                                 # 新增 ↓
+bindings_module = "sr"
+
 
 bindgen_extra_clang_args = [
     "-I${IDF_PATH}/components/esp_lcd/include",
