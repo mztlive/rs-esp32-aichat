@@ -14,7 +14,7 @@ pub enum WifiCommand {
     Connect(WifiConfig),
     Disconnect,
     GetStatus,
-    Scan,
+    // Scan,
 }
 
 #[derive(Debug, Clone)]
@@ -23,7 +23,7 @@ pub enum WifiEvent {
     Disconnected,
     ConnectionFailed(String), // Error message
     StatusUpdate(WifiStatus),
-    ScanResult(Vec<String>), // Network names
+    // ScanResult(Vec<String>), // Network names
 }
 
 #[derive(Debug, Clone)]
@@ -33,6 +33,12 @@ pub enum WifiStatus {
     Connecting,
     Scanning,
     Error(String),
+}
+
+impl WifiStatus {
+    pub fn is_connected(&self) -> bool {
+        matches!(self, WifiStatus::Connected)
+    }
 }
 
 pub struct WifiActor {
@@ -184,46 +190,45 @@ impl WifiActor {
                 let _ = self
                     .event_sender
                     .send(WifiEvent::StatusUpdate(self.current_status.clone()));
-            }
-            WifiCommand::Scan => {
-                info!("Scanning for WiFi networks");
-                self.current_status = WifiStatus::Scanning;
-                let _ = self
-                    .event_sender
-                    .send(WifiEvent::StatusUpdate(WifiStatus::Scanning));
+            } // WifiCommand::Scan => {
+              //     info!("Scanning for WiFi networks");
+              //     self.current_status = WifiStatus::Scanning;
+              //     let _ = self
+              //         .event_sender
+              //         .send(WifiEvent::StatusUpdate(WifiStatus::Scanning));
 
-                match self.wifi_manager.scan_networks() {
-                    Ok(networks) => {
-                        let network_names: Vec<String> =
-                            networks.into_iter().map(|ap| ap.ssid.to_string()).collect();
-                        let _ = self.event_sender.send(WifiEvent::ScanResult(network_names));
+              //     match self.wifi_manager.scan_networks() {
+              //         Ok(networks) => {
+              //             let network_names: Vec<String> =
+              //                 networks.into_iter().map(|ap| ap.ssid.to_string()).collect();
+              //             let _ = self.event_sender.send(WifiEvent::ScanResult(network_names));
 
-                        // Restore previous status after scan
-                        let status = if self.wifi_manager.is_connected() {
-                            WifiStatus::Connected
-                        } else {
-                            WifiStatus::Disconnected
-                        };
-                        self.current_status = status.clone();
-                        let _ = self.event_sender.send(WifiEvent::StatusUpdate(status));
-                    }
-                    Err(e) => {
-                        let error_msg = format!("WiFi scan failed: {}", e);
-                        let _ = self
-                            .event_sender
-                            .send(WifiEvent::StatusUpdate(WifiStatus::Error(error_msg)));
+              //             // Restore previous status after scan
+              //             let status = if self.wifi_manager.is_connected() {
+              //                 WifiStatus::Connected
+              //             } else {
+              //                 WifiStatus::Disconnected
+              //             };
+              //             self.current_status = status.clone();
+              //             let _ = self.event_sender.send(WifiEvent::StatusUpdate(status));
+              //         }
+              //         Err(e) => {
+              //             let error_msg = format!("WiFi scan failed: {}", e);
+              //             let _ = self
+              //                 .event_sender
+              //                 .send(WifiEvent::StatusUpdate(WifiStatus::Error(error_msg)));
 
-                        // Restore previous status
-                        let status = if self.wifi_manager.is_connected() {
-                            WifiStatus::Connected
-                        } else {
-                            WifiStatus::Disconnected
-                        };
-                        self.current_status = status.clone();
-                        let _ = self.event_sender.send(WifiEvent::StatusUpdate(status));
-                    }
-                }
-            }
+              //             // Restore previous status
+              //             let status = if self.wifi_manager.is_connected() {
+              //                 WifiStatus::Connected
+              //             } else {
+              //                 WifiStatus::Disconnected
+              //             };
+              //             self.current_status = status.clone();
+              //             let _ = self.event_sender.send(WifiEvent::StatusUpdate(status));
+              //         }
+              //     }
+              // }
         }
         Ok(())
     }
@@ -318,10 +323,10 @@ impl WifiActorManager {
         Ok(())
     }
 
-    pub fn scan_networks(&self) -> Result<()> {
-        self.command_sender.send(WifiCommand::Scan)?;
-        Ok(())
-    }
+    // pub fn scan_networks(&self) -> Result<()> {
+    //     self.command_sender.send(WifiCommand::Scan)?;
+    //     Ok(())
+    // }
 
     pub fn try_recv_event(&self) -> Result<WifiEvent, std::sync::mpsc::TryRecvError> {
         self.event_receiver.try_recv()
