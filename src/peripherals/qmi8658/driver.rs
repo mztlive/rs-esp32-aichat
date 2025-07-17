@@ -1,3 +1,37 @@
+//! QMI8658 6轴IMU传感器驱动
+//!
+//! 该模块提供了对QMI8658 6轴惯性测量单元(IMU)传感器的完整驱动支持。
+//! QMI8658集成了3轴加速度计和3轴陀螺仪，支持多种测量范围和输出数据率。
+//!
+//! # 功能特性
+//!
+//! - 支持I2C通信协议
+//! - 可配置的加速度计测量范围(±2g到±16g)
+//! - 可配置的陀螺仪测量范围(±32dps到±4096dps)
+//! - 多种输出数据率(ODR)选择
+//! - 温度测量
+//! - 运动唤醒功能
+//! - 支持多种单位输出(m/s²、mg、rad/s、dps)
+//!
+//! # 使用示例
+//!
+//! ```rust
+//! use esp_idf_hal::peripherals::Peripherals;
+//! use crate::peripherals::qmi8658::driver::QMI8658Driver;
+//!
+//! let peripherals = Peripherals::take().unwrap();
+//! let mut sensor = QMI8658Driver::new(
+//!     peripherals.i2c0,
+//!     peripherals.pins.gpio11,
+//!     peripherals.pins.gpio10,
+//!     0x6A
+//! )?;
+//!
+//! let sensor_data = sensor.read_sensor_data()?;
+//! println!("Accel: {:.2}, {:.2}, {:.2}",
+//!          sensor_data.accel_x, sensor_data.accel_y, sensor_data.accel_z);
+//! ```
+
 use anyhow::Result;
 use esp_idf_hal::gpio::{Gpio10, Gpio11};
 use esp_idf_hal::i2c::{I2cConfig, I2cDriver, I2C0};
@@ -5,7 +39,9 @@ use esp_idf_hal::prelude::*;
 use log::{error, info};
 use std::f32::consts::PI;
 
+/// QMI8658 I2C地址(当SA0引脚接地时)
 pub const QMI8658_ADDRESS_LOW: u8 = 0x6A;
+/// QMI8658 I2C地址(当SA0引脚接高电平时)
 pub const QMI8658_ADDRESS_HIGH: u8 = 0x6B;
 
 const M_PI: f32 = PI;
@@ -64,18 +100,31 @@ pub enum AccelRange {
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum AccelODR {
+    /// 8000Hz输出数据率
     ODR8000Hz = 0x00,
+    /// 4000Hz输出数据率
     ODR4000Hz = 0x01,
+    /// 2000Hz输出数据率
     ODR2000Hz = 0x02,
+    /// 1000Hz输出数据率
     ODR1000Hz = 0x03,
+    /// 500Hz输出数据率
     ODR500Hz = 0x04,
+    /// 250Hz输出数据率
     ODR250Hz = 0x05,
+    /// 125Hz输出数据率
     ODR125Hz = 0x06,
+    /// 62.5Hz输出数据率
     ODR62_5Hz = 0x07,
+    /// 31.25Hz输出数据率
     ODR31_25Hz = 0x08,
+    /// 低功耗128Hz输出数据率
     ODRLowPower128Hz = 0x0C,
+    /// 低功耗21Hz输出数据率
     ODRLowPower21Hz = 0x0D,
+    /// 低功耗11Hz输出数据率
     ODRLowPower11Hz = 0x0E,
+    /// 低功耗3Hz输出数据率
     ODRLowPower3Hz = 0x0F,
 }
 
@@ -95,14 +144,23 @@ pub enum GyroRange {
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum GyroODR {
+    /// 8000Hz输出数据率
     ODR8000Hz = 0x00,
+    /// 4000Hz输出数据率
     ODR4000Hz = 0x01,
+    /// 2000Hz输出数据率
     ODR2000Hz = 0x02,
+    /// 1000Hz输出数据率
     ODR1000Hz = 0x03,
+    /// 500Hz输出数据率
     ODR500Hz = 0x04,
+    /// 250Hz输出数据率
     ODR250Hz = 0x05,
+    /// 125Hz输出数据率
     ODR125Hz = 0x06,
+    /// 62.5Hz输出数据率
     ODR62_5Hz = 0x07,
+    /// 31.25Hz输出数据率
     ODR31_25Hz = 0x08,
 }
 
@@ -151,6 +209,18 @@ impl<'a> std::fmt::Debug for QMI8658Driver<'a> {
 }
 
 impl<'a> QMI8658Driver<'a> {
+    /// 创建新的QMI8658驱动器实例
+    /// 
+    /// # 参数
+    /// 
+    /// * `i2c0` - I2C外设实例
+    /// * `sda` - SDA引脚(GPIO11)
+    /// * `scl` - SCL引脚(GPIO10)
+    /// * `address` - 设备I2C地址
+    /// 
+    /// # 返回
+    /// 
+    /// 返回配置好的驱动器实例或错误
     pub fn new(i2c0: I2C0, sda: Gpio11, scl: Gpio10, address: u8) -> Result<Self> {
         let config = I2cConfig::new().baudrate(400.kHz().into());
         let i2c = I2cDriver::new(i2c0, sda, scl, &config)?;
@@ -175,6 +245,9 @@ impl<'a> QMI8658Driver<'a> {
         Ok(driver)
     }
 
+    /// 初始化传感器
+    /// 
+    /// 设置默认配置：8G加速度计范围，512DPS陀螺仪范围，1000Hz ODR
     fn init(&mut self) -> Result<()> {
         let who_am_i = self.get_who_am_i()?;
         if who_am_i != 0x05 {
@@ -194,18 +267,35 @@ impl<'a> QMI8658Driver<'a> {
         Ok(())
     }
 
+    /// 写入寄存器
+    /// 
+    /// # 参数
+    /// 
+    /// * `reg` - 寄存器地址
+    /// * `value` - 要写入的值
     fn write_register(&mut self, reg: QMI8658Register, value: u8) -> Result<()> {
         let data = [reg as u8, value];
         self.i2c.write(self.address, &data, 1000)?;
         Ok(())
     }
 
+    /// 读取寄存器
+    /// 
+    /// # 参数
+    /// 
+    /// * `reg` - 寄存器地址
+    /// * `buffer` - 存储读取数据的缓冲区
     fn read_register(&mut self, reg: QMI8658Register, buffer: &mut [u8]) -> Result<()> {
         let reg_addr = [reg as u8];
         self.i2c.write_read(self.address, &reg_addr, buffer, 1000)?;
         Ok(())
     }
 
+    /// 获取设备ID
+    /// 
+    /// # 返回
+    /// 
+    /// 返回设备ID，QMI8658应该返回0x05
     pub fn get_who_am_i(&mut self) -> Result<u8> {
         let mut buffer = [0u8; 1];
         match self.read_register(QMI8658Register::WhoAmI, &mut buffer) {
@@ -214,6 +304,11 @@ impl<'a> QMI8658Driver<'a> {
         }
     }
 
+    /// 设置加速度计测量范围
+    /// 
+    /// # 参数
+    /// 
+    /// * `range` - 测量范围配置
     pub fn set_accel_range(&mut self, range: AccelRange) -> Result<()> {
         self.accel_lsb_div = match range {
             AccelRange::Range2G => 16384,
@@ -225,6 +320,11 @@ impl<'a> QMI8658Driver<'a> {
         self.write_register(QMI8658Register::Ctrl2, ((range as u8) << 4) | 0x03)
     }
 
+    /// 设置加速度计输出数据率
+    /// 
+    /// # 参数
+    /// 
+    /// * `odr` - 输出数据率配置
     pub fn set_accel_odr(&mut self, odr: AccelODR) -> Result<()> {
         let mut current_ctrl2 = [0u8; 1];
         self.read_register(QMI8658Register::Ctrl2, &mut current_ctrl2)?;
@@ -233,6 +333,11 @@ impl<'a> QMI8658Driver<'a> {
         self.write_register(QMI8658Register::Ctrl2, new_ctrl2)
     }
 
+    /// 设置陀螺仪测量范围
+    /// 
+    /// # 参数
+    /// 
+    /// * `range` - 测量范围配置
     pub fn set_gyro_range(&mut self, range: GyroRange) -> Result<()> {
         self.gyro_lsb_div = match range {
             GyroRange::Range32DPS => 1024,
@@ -248,6 +353,11 @@ impl<'a> QMI8658Driver<'a> {
         self.write_register(QMI8658Register::Ctrl3, ((range as u8) << 4) | 0x03)
     }
 
+    /// 设置陀螺仪输出数据率
+    /// 
+    /// # 参数
+    /// 
+    /// * `odr` - 输出数据率配置
     pub fn set_gyro_odr(&mut self, odr: GyroODR) -> Result<()> {
         let mut current_ctrl3 = [0u8; 1];
         self.read_register(QMI8658Register::Ctrl3, &mut current_ctrl3)?;
@@ -256,6 +366,11 @@ impl<'a> QMI8658Driver<'a> {
         self.write_register(QMI8658Register::Ctrl3, new_ctrl3)
     }
 
+    /// 启用或禁用加速度计
+    /// 
+    /// # 参数
+    /// 
+    /// * `enable` - true启用，false禁用
     pub fn enable_accel(&mut self, enable: bool) -> Result<()> {
         let mut current_ctrl7 = [0u8; 1];
         self.read_register(QMI8658Register::Ctrl7, &mut current_ctrl7)?;
@@ -269,6 +384,11 @@ impl<'a> QMI8658Driver<'a> {
         self.write_register(QMI8658Register::Ctrl7, new_ctrl7)
     }
 
+    /// 启用或禁用陀螺仪
+    /// 
+    /// # 参数
+    /// 
+    /// * `enable` - true启用，false禁用
     pub fn enable_gyro(&mut self, enable: bool) -> Result<()> {
         let mut current_ctrl7 = [0u8; 1];
         self.read_register(QMI8658Register::Ctrl7, &mut current_ctrl7)?;
@@ -282,10 +402,20 @@ impl<'a> QMI8658Driver<'a> {
         self.write_register(QMI8658Register::Ctrl7, new_ctrl7)
     }
 
+    /// 启用传感器
+    /// 
+    /// # 参数
+    /// 
+    /// * `enable_flags` - 启用标志位组合
     pub fn enable_sensors(&mut self, enable_flags: u8) -> Result<()> {
         self.write_register(QMI8658Register::Ctrl7, enable_flags & 0x0F)
     }
 
+    /// 读取加速度计数据
+    /// 
+    /// # 返回
+    /// 
+    /// 返回(x, y, z)轴的加速度值
     pub fn read_accel(&mut self) -> Result<(f32, f32, f32)> {
         let mut buffer = [0u8; 6];
         self.read_register(QMI8658Register::AxL, &mut buffer)?;
@@ -311,6 +441,11 @@ impl<'a> QMI8658Driver<'a> {
         Ok((x, y, z))
     }
 
+    /// 读取陀螺仪数据
+    /// 
+    /// # 返回
+    /// 
+    /// 返回(x, y, z)轴的角速度值
     pub fn read_gyro(&mut self) -> Result<(f32, f32, f32)> {
         let mut buffer = [0u8; 6];
         self.read_register(QMI8658Register::GxL, &mut buffer)?;
@@ -336,6 +471,11 @@ impl<'a> QMI8658Driver<'a> {
         Ok((x, y, z))
     }
 
+    /// 读取温度数据
+    /// 
+    /// # 返回
+    /// 
+    /// 返回芯片温度值(°C)
     pub fn read_temperature(&mut self) -> Result<f32> {
         let mut buffer = [0u8; 2];
         self.read_register(QMI8658Register::TempL, &mut buffer)?;
@@ -344,6 +484,11 @@ impl<'a> QMI8658Driver<'a> {
         Ok(raw_temp as f32 / 256.0)
     }
 
+    /// 读取完整传感器数据
+    /// 
+    /// # 返回
+    /// 
+    /// 返回包含加速度计、陀螺仪、温度和时间戳的完整数据
     pub fn read_sensor_data(&mut self) -> Result<SensorData> {
         let mut timestamp_buffer = [0u8; 3];
         if self
@@ -414,62 +559,130 @@ impl<'a> QMI8658Driver<'a> {
         })
     }
 
+    /// 检查数据是否准备就绪
+    /// 
+    /// # 返回
+    /// 
+    /// 返回true表示有新数据可读取
     pub fn is_data_ready(&mut self) -> Result<bool> {
         let mut status = [0u8; 1];
         self.read_register(QMI8658Register::Status0, &mut status)?;
         Ok((status[0] & 0x03) != 0)
     }
 
+    /// 重置传感器
+    /// 
+    /// 执行软件重置操作
     pub fn reset(&mut self) -> Result<()> {
         self.write_register(QMI8658Register::Ctrl1, 0x80)
     }
 
+    /// 设置加速度计单位为m/s²
+    /// 
+    /// # 参数
+    /// 
+    /// * `use_mps2` - true使用m/s²，false使用mg
     pub fn set_accel_unit_mps2(&mut self, use_mps2: bool) {
         self.accel_unit_mps2 = use_mps2;
     }
 
+    /// 设置加速度计单位为mg
+    /// 
+    /// # 参数
+    /// 
+    /// * `use_mg` - true使用mg，false使用m/s²
     pub fn set_accel_unit_mg(&mut self, use_mg: bool) {
         self.accel_unit_mps2 = !use_mg;
     }
 
+    /// 设置陀螺仪单位为弧度/秒
+    /// 
+    /// # 参数
+    /// 
+    /// * `use_rads` - true使用rad/s，false使用dps
     pub fn set_gyro_unit_rads(&mut self, use_rads: bool) {
         self.gyro_unit_rads = use_rads;
     }
 
+    /// 设置陀螺仪单位为度/秒
+    /// 
+    /// # 参数
+    /// 
+    /// * `use_dps` - true使用dps，false使用rad/s
     pub fn set_gyro_unit_dps(&mut self, use_dps: bool) {
         self.gyro_unit_rads = !use_dps;
     }
 
+    /// 设置显示精度
+    /// 
+    /// # 参数
+    /// 
+    /// * `decimals` - 小数位数(0-10)
     pub fn set_display_precision(&mut self, decimals: i32) {
         if decimals >= 0 && decimals <= 10 {
             self.display_precision = decimals;
         }
     }
 
+    /// 使用枚举设置显示精度
+    /// 
+    /// # 参数
+    /// 
+    /// * `precision` - 精度枚举值
     pub fn set_display_precision_enum(&mut self, precision: Precision) {
         self.display_precision = precision as i32;
     }
 
+    /// 获取当前显示精度
+    /// 
+    /// # 返回
+    /// 
+    /// 返回当前设置的小数位数
     pub fn get_display_precision(&self) -> i32 {
         self.display_precision
     }
 
+    /// 检查加速度计单位是否为m/s²
+    /// 
+    /// # 返回
+    /// 
+    /// 返回true表示使用m/s²单位
     pub fn is_accel_unit_mps2(&self) -> bool {
         self.accel_unit_mps2
     }
 
+    /// 检查加速度计单位是否为mg
+    /// 
+    /// # 返回
+    /// 
+    /// 返回true表示使用mg单位
     pub fn is_accel_unit_mg(&self) -> bool {
         !self.accel_unit_mps2
     }
 
+    /// 检查陀螺仪单位是否为弧度/秒
+    /// 
+    /// # 返回
+    /// 
+    /// 返回true表示使用rad/s单位
     pub fn is_gyro_unit_rads(&self) -> bool {
         self.gyro_unit_rads
     }
 
+    /// 检查陀螺仪单位是否为度/秒
+    /// 
+    /// # 返回
+    /// 
+    /// 返回true表示使用dps单位
     pub fn is_gyro_unit_dps(&self) -> bool {
         !self.gyro_unit_rads
     }
 
+    /// 启用运动唤醒功能
+    /// 
+    /// # 参数
+    /// 
+    /// * `threshold` - 运动检测阈值
     pub fn enable_wake_on_motion(&mut self, threshold: u8) -> Result<()> {
         self.enable_sensors(QMI8658_DISABLE_ALL)?;
         self.set_accel_range(AccelRange::Range2G)?;
@@ -479,11 +692,17 @@ impl<'a> QMI8658Driver<'a> {
         self.enable_sensors(QMI8658_ENABLE_ACCEL)
     }
 
+    /// 禁用运动唤醒功能
     pub fn disable_wake_on_motion(&mut self) -> Result<()> {
         self.enable_sensors(QMI8658_DISABLE_ALL)?;
         self.write_register(QMI8658Register::Ctrl1, 0x00)
     }
 
+    /// 以mg单位读取加速度计数据
+    /// 
+    /// # 返回
+    /// 
+    /// 返回(x, y, z)轴的加速度值(mg)
     pub fn read_accel_mg(&mut self) -> Result<(f32, f32, f32)> {
         let old_unit = self.accel_unit_mps2;
         self.accel_unit_mps2 = false;
@@ -492,6 +711,11 @@ impl<'a> QMI8658Driver<'a> {
         result
     }
 
+    /// 以m/s²单位读取加速度计数据
+    /// 
+    /// # 返回
+    /// 
+    /// 返回(x, y, z)轴的加速度值(m/s²)
     pub fn read_accel_mps2(&mut self) -> Result<(f32, f32, f32)> {
         let old_unit = self.accel_unit_mps2;
         self.accel_unit_mps2 = true;
@@ -500,6 +724,11 @@ impl<'a> QMI8658Driver<'a> {
         result
     }
 
+    /// 以度/秒单位读取陀螺仪数据
+    /// 
+    /// # 返回
+    /// 
+    /// 返回(x, y, z)轴的角速度值(dps)
     pub fn read_gyro_dps(&mut self) -> Result<(f32, f32, f32)> {
         let old_unit = self.gyro_unit_rads;
         self.gyro_unit_rads = false;
@@ -508,6 +737,11 @@ impl<'a> QMI8658Driver<'a> {
         result
     }
 
+    /// 以弧度/秒单位读取陀螺仪数据
+    /// 
+    /// # 返回
+    /// 
+    /// 返回(x, y, z)轴的角速度值(rad/s)
     pub fn read_gyro_rads(&mut self) -> Result<(f32, f32, f32)> {
         let old_unit = self.gyro_unit_rads;
         self.gyro_unit_rads = true;
