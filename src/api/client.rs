@@ -14,8 +14,8 @@ pub struct ApiClient {
 }
 
 impl ApiClient {
-    pub fn new(config: ApiConfig) -> Result<Self> {
-        Ok(Self { config })
+    pub fn new(config: ApiConfig) -> Self {
+        Self { config }
     }
 
     fn build_headers(&self) -> Vec<(&str, &str)> {
@@ -52,15 +52,37 @@ impl ApiClient {
         }
     }
 
-    fn handle_api_error(status: u16, response_text: &str) -> Result<()> {
-        let error_response: ApiResponse<serde_json::Value> = serde_json::from_str(response_text)?;
-        Err(anyhow::anyhow!(
-            "API error {}: {}",
-            status,
-            error_response
-                .message
-                .unwrap_or_else(|| "Unknown error".to_string())
-        ))
+    fn create_api_error(status: u16, response_text: &str) -> anyhow::Error {
+        match serde_json::from_str::<ApiResponse<serde_json::Value>>(response_text) {
+            Ok(error_response) => anyhow::anyhow!(
+                "API error {}: {}",
+                status,
+                error_response
+                    .message
+                    .unwrap_or_else(|| "Unknown error".to_string())
+            ),
+            Err(_) => anyhow::anyhow!("API error {}: {}", status, response_text),
+        }
+    }
+
+    fn handle_response<T>(&self, status: u16, response_text: &str) -> Result<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        if status == 200 {
+            let api_response: ApiResponse<T> = serde_json::from_str(response_text)?;
+            Ok(api_response.data)
+        } else {
+            Err(Self::create_api_error(status, response_text))
+        }
+    }
+
+    fn handle_response_unit(&self, status: u16, response_text: &str) -> Result<()> {
+        if status == 200 {
+            Ok(())
+        } else {
+            Err(Self::create_api_error(status, response_text))
+        }
     }
 
     fn execute_get_request(&self, url: &str) -> Result<(u16, String)> {
@@ -101,14 +123,8 @@ impl ApiClient {
         }
 
         let (status, response_text) = self.execute_get_request(&url)?;
-
-        if status == 200 {
-            let api_response: ApiResponse<SessionInfo> = serde_json::from_str(&response_text)?;
-            Ok(api_response.data.session_id)
-        } else {
-            Self::handle_api_error(status, &response_text)?;
-            unreachable!()
-        }
+        let session_info: SessionInfo = self.handle_response(status, &response_text)?;
+        Ok(session_info.session_id)
     }
 
     pub fn send_message(
@@ -125,13 +141,7 @@ impl ApiClient {
         let body_json = serde_json::to_string(&request_body)?;
 
         let (status, response_text) = self.execute_post_request(&url, &body_json)?;
-
-        if status == 200 {
-            Ok(())
-        } else {
-            Self::handle_api_error(status, &response_text)?;
-            unreachable!()
-        }
+        self.handle_response_unit(status, &response_text)
     }
 
     pub fn prompt_sync(
@@ -148,13 +158,6 @@ impl ApiClient {
         let body_json = serde_json::to_string(&request_body)?;
 
         let (status, response_text) = self.execute_post_request(&url, &body_json)?;
-
-        if status == 200 {
-            let api_response: ApiResponse<String> = serde_json::from_str(&response_text)?;
-            Ok(api_response.data)
-        } else {
-            Self::handle_api_error(status, &response_text)?;
-            unreachable!()
-        }
+        self.handle_response(status, &response_text)
     }
 }

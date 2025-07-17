@@ -14,6 +14,7 @@ mod peripherals;
 
 use crate::{
     actors::{motion::MotionActorManager, wifi::WifiActorManager},
+    api::ApiConfig,
     app::App,
     display::Display,
     events::{AppEvent, EventBus, EventHandler},

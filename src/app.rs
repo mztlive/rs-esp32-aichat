@@ -2,6 +2,7 @@ use std::time;
 
 use crate::{
     actors::wifi::WifiEvent,
+    api::{self, ApiConfig},
     display::Display,
     events::{AppEvent, EventHandler, SystemEvent},
     peripherals::qmi8658::motion_detector::MotionState,
@@ -34,6 +35,17 @@ impl<'a> App<'a> {
         match wifi_event {
             WifiEvent::Connected(ip) => {
                 println!("WiFi连接成功! IP: {}", ip);
+                let client = api::ApiClient::new(ApiConfig {
+                    base_url: "http://111.230.48.137:3001/api".to_string(),
+                    fingerprint: "esp32".to_string(),
+                    timeout_secs: 10,
+                });
+
+                let resp = client
+                    .create_session(Some("deepseek/deepseek-r1-0528"))
+                    .unwrap();
+
+                println!("创建会话成功，会话ID: {}", resp);
             }
             WifiEvent::Disconnected => {
                 println!("WiFi连接断开");
