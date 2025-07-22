@@ -1,9 +1,11 @@
+use std::time::Duration;
+
 // src/main.rs
 use anyhow::Result;
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals};
 use esp_idf_svc::{eventloop::EspSystemEventLoop, nvs::EspDefaultNvsPartition};
 use esp_idf_sys::{
-    heap_caps_get_free_size, heap_caps_get_largest_free_block,
+    esp_timer_get_time, heap_caps_get_free_size, heap_caps_get_largest_free_block,
     sr::{
         afe_config_init, afe_mode_t_AFE_MODE_HIGH_PERF, afe_type_t_AFE_TYPE_SR,
         esp_afe_handle_from_config, esp_srmodel_init,
@@ -21,11 +23,15 @@ mod peripherals;
 
 use crate::{
     actors::{motion::MotionActorManager, wifi::WifiActorManager},
+    api::{
+        client::ApiClient,
+        pcm_client::{PcmClient, PcmClientConfig},
+    },
     app::App,
     display::Display,
     events::{EventBus, EventHandler},
     graphics::primitives::GraphicsPrimitives,
-    peripherals::{st77916::lcd::LcdController, wifi::WifiConfig},
+    peripherals::{microphone, st77916::lcd::LcdController, wifi::WifiConfig},
 };
 
 fn main() -> Result<()> {
@@ -62,10 +68,11 @@ fn main() -> Result<()> {
     wifi_actor.connect(wifi_config)?;
 
     // mic gpio
-    // let i2s = p.i2s0;
-    // let ws = p.pins.gpio2;
-    // let sck = p.pins.gpio15;
-    // let sd = p.pins.gpio39;
+    let i2s = p.i2s0;
+    let ws = p.pins.gpio2;
+    let sck = p.pins.gpio15;
+    let sd = p.pins.gpio39;
+    let mic = microphone::i2s_microphone::I2sMicrophone::new(i2s, ws, sck, sd, 16000)?;
 
     // lcd背光控制gpio - 先初始化显示系统
     let bl_io = p.pins.gpio5;
@@ -74,21 +81,9 @@ fn main() -> Result<()> {
     let graphics = GraphicsPrimitives::new(&mut lcd);
     let display = Display::new(graphics);
 
-    let mut app = App::new(display);
+    let mut app = App::new(display, mic);
 
     println!("应用启动成功，进入主循环...");
-
-    unsafe {
-        let models = esp_srmodel_init("model".as_ptr());
-        let cfg = afe_config_init(
-            "MMNR".as_ptr(),
-            models,
-            afe_type_t_AFE_TYPE_SR,
-            afe_mode_t_AFE_MODE_HIGH_PERF,
-        );
-
-        let afe_handle = esp_afe_handle_from_config(cfg);
-    }
 
     loop {
         // 处理事件
@@ -105,10 +100,4 @@ fn main() -> Result<()> {
 
         FreeRtos::delay_ms(50);
     }
-}
-
-fn print_internal(tag: &str) {
-    let free = unsafe { heap_caps_get_free_size(MALLOC_CAP_INTERNAL) };
-    let large = unsafe { heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) };
-    println!("{tag}: free={free}  largest={large}");
 }

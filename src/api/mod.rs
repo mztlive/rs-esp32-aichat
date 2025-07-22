@@ -1,4 +1,5 @@
 pub mod client;
+pub mod pcm_client;
 pub mod types;
 
 #[derive(Debug, Clone)]

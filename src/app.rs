@@ -1,22 +1,34 @@
+use std::ffi::CStr;
+
 use crate::{
     actors::wifi::WifiEvent,
+    api::pcm_client::{PcmClient, PcmClientConfig},
     display::Display,
     events::{AppEvent, EventHandler, SystemEvent},
-    peripherals::qmi8658::motion_detector::MotionState,
+    peripherals::{
+        microphone::{self, i2s_microphone::I2sMicrophone},
+        qmi8658::motion_detector::MotionState,
+    },
 };
 
 use anyhow::Result;
+use esp_idf_sys::sr::{
+    afe_config_init, afe_mode_t_AFE_MODE_HIGH_PERF, afe_type_t_AFE_TYPE_SR,
+    esp_afe_handle_from_config, esp_srmodel_init,
+};
 
 pub struct App<'a> {
     display: Display<'a>,
     network_state: bool,
+    micphone: I2sMicrophone,
 }
 
 impl<'a> App<'a> {
-    pub fn new(display: Display<'a>) -> Self {
+    pub fn new(display: Display<'a>, micphone: I2sMicrophone) -> Self {
         Self {
             display,
             network_state: false,
+            micphone,
         }
     }
 
@@ -48,6 +60,71 @@ impl<'a> App<'a> {
 
                 // println!("创建会话成功，会话ID: {}", resp);
                 self.network_state = true;
+
+                let pcm_client = PcmClient::new(PcmClientConfig {
+                    base_url: "http://pcmtest.s7.tunnelfrp.com".to_string(),
+                    session_id: "session_id".to_string(),
+                    timeout_secs: 60,
+                });
+
+                unsafe {
+                    let models = esp_srmodel_init(c"model".as_ptr());
+                    let model_num = (*models).num;
+                    println!("模型数量: {}", model_num);
+                    for i in 0..model_num {
+                        // 获取第 i 个模型名称的 C
+                        // 字符串指针
+                        let model_name_ptr = (*models).model_name.offset(i as isize);
+                        if !model_name_ptr.is_null() && !(*model_name_ptr).is_null() {
+                            // 将 C 字符串转换为 Rust
+                            //字符串
+                            let c_str = CStr::from_ptr(*model_name_ptr);
+                            match c_str.to_str() {
+                                Ok(name) => println!("Model {}: {}", i, name),
+                                Err(_) => println!("Model {}: <invalid UTF-8>", i),
+                            }
+                        } else {
+                            println!("Model {}: <null>", i);
+                        }
+                    }
+
+                    let cfg = afe_config_init(
+                        c"MMNR".as_ptr(),
+                        models,
+                        afe_type_t_AFE_TYPE_SR,
+                        afe_mode_t_AFE_MODE_HIGH_PERF,
+                    );
+
+                    let afe_handle = esp_afe_handle_from_config(cfg);
+                    let fetch_fn = (*afe_handle).fetch.unwrap();
+                    let feed_fn = (*afe_handle).feed.unwrap();
+                    let afe_data = (*afe_handle).create_from_config.unwrap()(cfg);
+                    let feed_size = (*afe_handle).get_feed_chunksize.unwrap()(afe_data);
+                    let fetch_size = (*afe_handle).get_fetch_chunksize.unwrap()(afe_data);
+                    let feed_nch = (*afe_handle).get_feed_channel_num.unwrap()(afe_data);
+                    let buffer_size = feed_size * feed_nch;
+
+                    println!(
+                        "Starting Wakeup. feed_nch: {}, feed_size: {}, fetch_size: {}, buffer_size: {}",
+                        feed_nch, feed_size, fetch_size, buffer_size
+                    );
+
+                    self.micphone.start_recording()?;
+                    self.micphone
+                        .record_with_callback(30, buffer_size as usize, move |buffer| {
+                            println!("buffer size: {}", buffer.len());
+
+                            let u8_buffer: &[u8] = bytemuck::cast_slice(buffer);
+                            // pcm_client.send_pcm_chunk(u8_buffer).unwrap();
+
+                            feed_fn(afe_data, buffer.as_ptr());
+                            let res = fetch_fn(afe_data);
+                            let state = (*res).wakeup_state;
+                            println!("Wake up State is: {:?}", state);
+                            return true;
+                        })
+                        .unwrap();
+                }
             }
             WifiEvent::Disconnected => {
                 self.network_state = false;
